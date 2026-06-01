@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { supabase } from "./lib/supabase";
+import Auth from "./components/Auth";
 
 const PHASES = [
   { id: "regular", label: "レギュラー", multiplier: 1.0 },
@@ -76,12 +78,23 @@ const C = {
 };
 
 export default function App() {
+  const [session, setSession] = useState(undefined); // undefined = loading
   const [games, setGames] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
   });
   const [form, setForm] = useState(initialForm);
   const [tab, setTab] = useState("add");
   const [editId, setEditId] = useState(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(games));
@@ -129,6 +142,10 @@ export default function App() {
     if (confirm("削除しますか？")) setGames(gs => gs.filter(g => g.id !== id));
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
   const resultInfo = (g) => {
     const r = RESULTS.find(r => r.id === g.result);
     const ph = PHASES.find(p => p.id === g.phase);
@@ -143,14 +160,32 @@ export default function App() {
     color: selected ? C.selected : C.muted,
   });
 
+  if (session === undefined) {
+    return (
+      <div style={{ maxWidth: 480, margin: "0 auto", fontFamily: "sans-serif", background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ color: C.muted }}>読み込み中...</div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Auth />;
+  }
+
   return (
     <div style={{ maxWidth: 480, margin: "0 auto", fontFamily: "sans-serif", background: C.bg, minHeight: "100vh", color: C.accent }}>
       {/* Header */}
-      <div style={{ background: "#000", padding: "16px", textAlign: "center", borderBottom: "3px solid #fff" }}>
+      <div style={{ background: "#000", padding: "16px", textAlign: "center", borderBottom: "3px solid #fff", position: "relative" }}>
         <div style={{ fontSize: 11, letterSpacing: 3, color: C.muted, marginBottom: 4 }}>CHIBA LOTTE MARINES</div>
         <div style={{ fontSize: 20, fontWeight: "bold", color: "#fff" }}>⚾ 千葉ロッテマリーンズ貯金</div>
         <div style={{ fontSize: 30, fontWeight: "bold", color: C.gold, marginTop: 6 }}>¥{total.toLocaleString()}</div>
         <div style={{ fontSize: 12, color: C.muted }}>累計貯金額（{games.length}試合）</div>
+        <button
+          onClick={handleLogout}
+          style={{ position: "absolute", top: 12, right: 12, background: "transparent", border: `1px solid ${C.cardBorder}`, borderRadius: 6, color: C.muted, fontSize: 12, padding: "4px 10px", cursor: "pointer" }}
+        >
+          ログアウト
+        </button>
       </div>
 
       {/* Tabs */}
