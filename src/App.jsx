@@ -62,8 +62,6 @@ function calcAmount(form) {
   return Math.round(base * phase.multiplier);
 }
 
-const STORAGE_KEY = "baseball_savings_v1";
-
 const C = {
   bg: "#111111",
   card: "#1e1e1e",
@@ -77,32 +75,61 @@ const C = {
   gold: "#f0c040",
 };
 
+function toRow(form, userId) {
+  return {
+    user_id: userId,
+    date: form.date,
+    phase: form.phase,
+    opponent: form.opponent,
+    result: form.result,
+    home_runs: form.homeRuns,
+    grand_slams: form.grandSlams,
+    pitcher_bonus: form.pitcherBonus,
+    amount: calcAmount(form),
+    other_bonus_amount: form.otherBonusAmount || 0,
+    other_bonus_note: form.otherBonusNote || "",
+  };
+}
+
+function fromRow(g) {
+  return {
+    id: g.id,
+    date: g.date,
+    phase: g.phase,
+    opponent: g.opponent,
+    result: g.result,
+    homeRuns: g.home_runs,
+    grandSlams: g.grand_slams,
+    pitcherBonus: g.pitcher_bonus,
+    amount: g.amount,
+    otherBonusAmount: g.other_bonus_amount || 0,
+    otherBonusNote: g.other_bonus_note || "",
+  };
+}
+
 export default function App() {
-  const [session, setSession] = useState(undefined); // undefined = loading
-  const [games, setGames] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
-  });
+  const [session, setSession] = useState(undefined);
+  const [games, setGames] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [tab, setTab] = useState("add");
   const [editId, setEditId] = useState(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      console.log("[DEBUG] session:", session);
-      console.log("[DEBUG] user_id:", session?.user?.id ?? "未ログイン");
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      console.log("[DEBUG] auth state changed:", _event);
-      console.log("[DEBUG] user_id:", session?.user?.id ?? "未ログイン");
-    });
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
     return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(games));
-  }, [games]);
+    if (!session) return;
+    supabase
+      .from("games")
+      .select("*")
+      .order("date", { ascending: false })
+      .then(({ data }) => {
+        if (data) setGames(data.map(fromRow));
+      });
+  }, [session]);
 
   const total = useMemo(() => games.reduce((s, g) => s + g.amount, 0), [games]);
 
@@ -115,12 +142,15 @@ export default function App() {
   const preview = calcAmount(form);
   const upd = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    const row = toRow(form, session.user.id);
     if (editId) {
-      setGames(gs => gs.map(g => g.id === editId ? { ...g, ...form, amount: calcAmount(form) } : g));
+      const { data } = await supabase.from("games").update(row).eq("id", editId).select().single();
+      if (data) setGames(gs => gs.map(g => g.id === editId ? fromRow(data) : g));
       setEditId(null);
     } else {
-      setGames(gs => [...gs, { id: Date.now(), ...form, amount: calcAmount(form) }]);
+      const { data } = await supabase.from("games").insert(row).select().single();
+      if (data) setGames(gs => [fromRow(data), ...gs]);
     }
     setForm(initialForm);
     setTab("list");
@@ -142,8 +172,10 @@ export default function App() {
     setTab("add");
   };
 
-  const handleDelete = (id) => {
-    if (confirm("削除しますか？")) setGames(gs => gs.filter(g => g.id !== id));
+  const handleDelete = async (id) => {
+    if (!confirm("削除しますか？")) return;
+    const { error } = await supabase.from("games").delete().eq("id", id);
+    if (!error) setGames(gs => gs.filter(g => g.id !== id));
   };
 
   const handleLogout = async () => {
