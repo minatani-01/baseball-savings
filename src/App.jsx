@@ -1,7 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { supabase } from "./lib/supabase";
-import Auth from "./components/Auth";
 
 const PHASES = [
   { id: "regular", label: "レギュラー", multiplier: 1.0 },
@@ -40,6 +38,8 @@ const OPPONENTS = [
   { id: "swallows", label: "ヤクルト" },
 ];
 
+const OTHER_BONUS_AMOUNTS = [0, 100, 500, 1000];
+
 const initialForm = {
   date: new Date().toISOString().split("T")[0],
   phase: "regular",
@@ -48,45 +48,19 @@ const initialForm = {
   homeRuns: 0,
   grandSlams: 0,
   pitcherBonus: "none",
+  otherBonusAmount: 0,
+  otherBonusNote: "",
 };
 
 function calcAmount(form) {
   const phase = PHASES.find(p => p.id === form.phase);
   const result = RESULTS.find(r => r.id === form.result);
   const pitcher = PITCHER_BONUSES.find(p => p.id === form.pitcherBonus);
-  const base = result.base + form.homeRuns * 200 + form.grandSlams * 500 + pitcher.amount;
+  const base = result.base + form.homeRuns * 200 + form.grandSlams * 500 + pitcher.amount + (form.otherBonusAmount || 0);
   return Math.round(base * phase.multiplier);
 }
 
-// DB row (snake_case) → app object (camelCase)
-function fromDb(row) {
-  return {
-    id: row.id,
-    date: row.date,
-    phase: row.phase,
-    opponent: row.opponent,
-    result: row.result,
-    homeRuns: row.home_runs,
-    grandSlams: row.grand_slams,
-    pitcherBonus: row.pitcher_bonus,
-    amount: row.amount,
-  };
-}
-
-// app object (camelCase) → DB insert payload (snake_case)
-function toDb(form, userId) {
-  return {
-    user_id: userId,
-    date: form.date,
-    phase: form.phase,
-    opponent: form.opponent,
-    result: form.result,
-    home_runs: form.homeRuns,
-    grand_slams: form.grandSlams,
-    pitcher_bonus: form.pitcherBonus,
-    amount: calcAmount(form),
-  };
-}
+const STORAGE_KEY = "baseball_savings_v1";
 
 const C = {
   bg: "#111111",
@@ -102,40 +76,16 @@ const C = {
 };
 
 export default function App() {
-  const [session, setSession] = useState(undefined); // undefined = loading
-  const [games, setGames] = useState([]);
+  const [games, setGames] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
+  });
   const [form, setForm] = useState(initialForm);
   const [tab, setTab] = useState("add");
   const [editId, setEditId] = useState(null);
-  const [loadingData, setLoadingData] = useState(false);
 
-  // Auth state
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Load games when session changes
-  useEffect(() => {
-    if (!session) {
-      setGames([]);
-      return;
-    }
-    setLoadingData(true);
-    supabase
-      .from("games")
-      .select("*")
-      .order("date", { ascending: false })
-      .then(({ data, error }) => {
-        if (!error && data) setGames(data.map(fromDb));
-        setLoadingData(false);
-      });
-  }, [session]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(games));
+  }, [games]);
 
   const total = useMemo(() => games.reduce((s, g) => s + g.amount, 0), [games]);
 
@@ -148,47 +98,35 @@ export default function App() {
   const preview = calcAmount(form);
   const upd = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const handleSubmit = async () => {
-    const userId = session.user.id;
+  const handleSubmit = () => {
     if (editId) {
-      const { data, error } = await supabase
-        .from("games")
-        .update(toDb(form, userId))
-        .eq("id", editId)
-        .select()
-        .single();
-      if (!error && data) {
-        setGames(gs => gs.map(g => g.id === editId ? fromDb(data) : g));
-      }
+      setGames(gs => gs.map(g => g.id === editId ? { ...g, ...form, amount: calcAmount(form) } : g));
       setEditId(null);
     } else {
-      const { data, error } = await supabase
-        .from("games")
-        .insert(toDb(form, userId))
-        .select()
-        .single();
-      if (!error && data) {
-        setGames(gs => [fromDb(data), ...gs]);
-      }
+      setGames(gs => [...gs, { id: Date.now(), ...form, amount: calcAmount(form) }]);
     }
     setForm(initialForm);
     setTab("list");
   };
 
   const handleEdit = (g) => {
-    setForm({ date: g.date, phase: g.phase, opponent: g.opponent || "fighters", result: g.result, homeRuns: g.homeRuns, grandSlams: g.grandSlams, pitcherBonus: g.pitcherBonus });
+    setForm({
+      date: g.date,
+      phase: g.phase,
+      opponent: g.opponent || "fighters",
+      result: g.result,
+      homeRuns: g.homeRuns,
+      grandSlams: g.grandSlams,
+      pitcherBonus: g.pitcherBonus,
+      otherBonusAmount: g.otherBonusAmount || 0,
+      otherBonusNote: g.otherBonusNote || "",
+    });
     setEditId(g.id);
     setTab("add");
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm("削除しますか？")) return;
-    const { error } = await supabase.from("games").delete().eq("id", id);
-    if (!error) setGames(gs => gs.filter(g => g.id !== id));
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  const handleDelete = (id) => {
+    if (confirm("削除しますか？")) setGames(gs => gs.filter(g => g.id !== id));
   };
 
   const resultInfo = (g) => {
@@ -205,51 +143,34 @@ export default function App() {
     color: selected ? C.selected : C.muted,
   });
 
-  // Loading auth state
-  if (session === undefined) {
-    return (
-      <div style={{ maxWidth: 480, margin: "0 auto", fontFamily: "sans-serif", background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: C.muted }}>読み込み中...</div>
-      </div>
-    );
-  }
-
-  // Not logged in
-  if (!session) {
-    return <Auth />;
-  }
-
   return (
     <div style={{ maxWidth: 480, margin: "0 auto", fontFamily: "sans-serif", background: C.bg, minHeight: "100vh", color: C.accent }}>
       {/* Header */}
-      <div style={{ background: "#000", padding: "16px", textAlign: "center", borderBottom: "3px solid #fff", position: "relative" }}>
+      <div style={{ background: "#000", padding: "16px", textAlign: "center", borderBottom: "3px solid #fff" }}>
         <div style={{ fontSize: 11, letterSpacing: 3, color: C.muted, marginBottom: 4 }}>CHIBA LOTTE MARINES</div>
         <div style={{ fontSize: 20, fontWeight: "bold", color: "#fff" }}>⚾ 千葉ロッテマリーンズ貯金</div>
         <div style={{ fontSize: 30, fontWeight: "bold", color: C.gold, marginTop: 6 }}>¥{total.toLocaleString()}</div>
         <div style={{ fontSize: 12, color: C.muted }}>累計貯金額（{games.length}試合）</div>
-        <button
-          onClick={handleLogout}
-          style={{ position: "absolute", top: 12, right: 12, background: "transparent", border: `1px solid ${C.cardBorder}`, borderRadius: 6, color: C.muted, fontSize: 12, padding: "4px 10px", cursor: "pointer" }}
-        >
-          ログアウト
-        </button>
       </div>
 
       {/* Tabs */}
       <div style={{ display: "flex", borderBottom: `1px solid ${C.cardBorder}`, background: "#000" }}>
-        {[["add", editId ? "✏️ 編集" : "➕ 記録"], ["list", "📋 一覧"], ["chart", "📈 グラフ"]].map(([id, label]) => (
+        {[["add", editId ? "✏️ 編集" : "➕ 記録"], ["list", "📋 一覧"], ["chart", "📈 グラフ"], ["summary", "📊 集計"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} style={{
             flex: 1, padding: "12px 0", background: "transparent",
             color: tab === id ? "#fff" : C.muted,
             border: "none", borderBottom: tab === id ? "2px solid #fff" : "2px solid transparent",
-            cursor: "pointer", fontWeight: tab === id ? "bold" : "normal", fontSize: 13
+            cursor: "pointer", fontWeight: tab === id ? "bold" : "normal", fontSize: 11
           }}>{label}</button>
         ))}
       </div>
 
       <div style={{ padding: 16 }}>
+
+        {/* ADD TAB */}
         {tab === "add" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
             {/* Date */}
             <div>
               <div style={labelStyle}>📅 試合日</div>
@@ -319,6 +240,25 @@ export default function App() {
               </select>
             </div>
 
+            {/* Other Bonus */}
+            <div>
+              <div style={labelStyle}>🎯 その他ボーナス（珍記録など）</div>
+              <input
+                type="text"
+                placeholder="内容を記述（例：代打逆転満塁HR）"
+                value={form.otherBonusNote}
+                onChange={e => upd("otherBonusNote", e.target.value)}
+                style={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 8, padding: "10px 12px", color: "#fff", fontSize: 14, width: "100%", boxSizing: "border-box", marginBottom: 8 }}
+              />
+              <div style={{ display: "flex", gap: 8 }}>
+                {OTHER_BONUS_AMOUNTS.map(amt => (
+                  <button key={amt} onClick={() => upd("otherBonusAmount", amt)} style={{ ...chip(form.otherBonusAmount === amt), flex: 1, textAlign: "center" }}>
+                    {amt === 0 ? "なし" : `¥${amt}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Preview */}
             <div style={{ background: "#000", borderRadius: 12, padding: 14, textAlign: "center", border: "1px solid #fff" }}>
               <div style={{ color: C.muted, fontSize: 13 }}>今回の積立額</div>
@@ -338,11 +278,10 @@ export default function App() {
           </div>
         )}
 
+        {/* LIST TAB */}
         {tab === "list" && (
           <div>
-            {loadingData ? (
-              <div style={{ textAlign: "center", color: C.muted, marginTop: 40 }}>読み込み中...</div>
-            ) : games.length === 0 ? (
+            {games.length === 0 ? (
               <div style={{ textAlign: "center", color: C.muted, marginTop: 40 }}>まだ記録がありません</div>
             ) : (
               [...games].sort((a, b) => b.date.localeCompare(a.date)).map(g => {
@@ -356,7 +295,8 @@ export default function App() {
                         <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>
                           {g.homeRuns > 0 && `HR×${g.homeRuns} `}
                           {g.grandSlams > 0 && `満塁HR×${g.grandSlams} `}
-                          {pb && pb.amount > 0 && pb.label}
+                          {pb && pb.amount > 0 && pb.label + " "}
+                          {g.otherBonusNote && `🎯${g.otherBonusNote}`}
                         </div>
                       </div>
                       <div style={{ textAlign: "right" }}>
@@ -374,6 +314,7 @@ export default function App() {
           </div>
         )}
 
+        {/* CHART TAB */}
         {tab === "chart" && (
           <div>
             {chartData.length < 2 ? (
@@ -401,6 +342,51 @@ export default function App() {
             )}
           </div>
         )}
+
+        {/* SUMMARY TAB */}
+        {tab === "summary" && (
+          <div>
+            {games.length === 0 ? (
+              <div style={{ textAlign: "center", color: C.muted, marginTop: 40 }}>まだ記録がありません</div>
+            ) : (() => {
+              const monthly = {};
+              games.forEach(g => {
+                const key = g.date.slice(0, 7);
+                if (!monthly[key]) monthly[key] = { total: 0, count: 0, wins: 0 };
+                monthly[key].total += g.amount;
+                monthly[key].count += 1;
+                if (g.result === "win" || g.result === "sayonara") monthly[key].wins += 1;
+              });
+              const sorted = Object.keys(monthly).sort((a, b) => b.localeCompare(a));
+              return (
+                <div>
+                  <div style={{ background: "#000", borderRadius: 10, padding: 12, marginBottom: 16, textAlign: "center", border: "1px solid #fff" }}>
+                    <div style={{ fontSize: 12, color: C.muted }}>累計貯金額</div>
+                    <div style={{ fontSize: 28, fontWeight: "bold", color: C.gold }}>¥{total.toLocaleString()}</div>
+                  </div>
+                  {sorted.map(key => {
+                    const m = monthly[key];
+                    const [y, mo] = key.split("-");
+                    return (
+                      <div key={key} style={{ background: C.card, borderRadius: 10, padding: 14, marginBottom: 10, border: `1px solid ${C.cardBorder}` }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div>
+                            <div style={{ fontSize: 16, fontWeight: "bold" }}>{y}年{mo}月</div>
+                            <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
+                              {m.count}試合　{m.wins}勝　勝率{m.count > 0 ? Math.round(m.wins / m.count * 100) : 0}%
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 22, fontWeight: "bold", color: C.gold }}>¥{m.total.toLocaleString()}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
       </div>
     </div>
   );
