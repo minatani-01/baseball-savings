@@ -89,9 +89,13 @@ export default function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      console.log("[DEBUG] session:", session);
+      console.log("[DEBUG] user_id:", session?.user?.id ?? "未ログイン");
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      console.log("[DEBUG] auth state changed:", _event);
+      console.log("[DEBUG] user_id:", session?.user?.id ?? "未ログイン");
     });
     return () => subscription.unsubscribe();
   }, []);
