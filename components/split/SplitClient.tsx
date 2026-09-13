@@ -5,84 +5,87 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Amount,
+  Avatar,
   Button,
   Card,
   EmptyState,
   IconButton,
+  IconFrame,
+  PillTabs,
+  ProgressBar,
   SectionLabel,
   Segmented,
-  StatusPill,
 } from '@/components/ui'
-import { IconChevronRight, IconEdit, IconPlus, IconTrash, IconUser } from '@/components/icons'
+import { IconChevronRight, IconEdit, IconPlus, IconTrash, IconUsers } from '@/components/icons'
+import CategoryIcon from '@/components/CategoryIcon'
 import { CopyAmountButton, OpenAppButton } from '@/components/HandoffActions'
 import SplitSheet from '@/components/split/SplitSheet'
 import { createClient } from '@/lib/supabase/client'
 import { distributeEqual, simplifyDebts } from '@/lib/warikan'
 import { shortDate, yen } from '@/lib/format'
 import { categoryLabel } from '@/lib/constants'
-import type { FilterStatus, MemberSettings, Share, SortOrder, SplitRecord } from '@/types'
+import type { Share, SortOrder, SplitFilter, SplitMember, SplitRecord } from '@/types'
 
-function sharesOf(record: SplitRecord, settings: MemberSettings): Share[] {
+function sharesOf(record: SplitRecord, fallbackNames: string[]): Share[] {
   if (record.shares && record.shares.length > 0) return record.shares
-  const members = [settings.member_a, settings.member_b]
-  const burdens = distributeEqual(record.amount, members.length)
-  return members.map((m, i) => ({ member: m, value: null, burden: burdens[i] }))
+  const names = fallbackNames.slice(0, Math.max(2, record.member_count))
+  const burdens = distributeEqual(record.amount, names.length)
+  return names.map((m, i) => ({ member: m, value: null, burden: burdens[i] }))
 }
 
 export default function SplitClient({
   userId,
   records,
-  settings,
+  members,
 }: {
   userId: string
   records: SplitRecord[]
-  settings: MemberSettings
+  members: SplitMember[]
 }) {
   const router = useRouter()
-  const [filter, setFilter] = useState<FilterStatus>('all')
+  const [filter, setFilter] = useState<SplitFilter>('unpaid')
   const [sort, setSort] = useState<SortOrder>('desc')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<SplitRecord | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const memberNames = useMemo(() => {
-    const names = [settings.member_a, settings.member_b]
-    if (settings.member_c?.trim()) names.push(settings.member_c.trim())
-    return names
-  }, [settings])
-
+  const memberNames = useMemo(() => members.map((m) => m.name), [members])
   const unpaid = useMemo(() => records.filter((r) => r.status === 'unpaid'), [records])
+  const paid = useMemo(() => records.filter((r) => r.status === 'paid'), [records])
 
-  const { paidTotals, transfers, unpaidTotal } = useMemo(() => {
-    const paid = new Map<string, number>(memberNames.map((m) => [m, 0]))
-    const burden = new Map<string, number>(memberNames.map((m) => [m, 0]))
+  const { paidTotals, transfers, unpaidTotal, settledTotal, grandTotal } = useMemo(() => {
+    const paidMap = new Map<string, number>(memberNames.map((m) => [m, 0]))
+    const burdenMap = new Map<string, number>(memberNames.map((m) => [m, 0]))
 
     for (const record of unpaid) {
-      paid.set(record.payer, (paid.get(record.payer) ?? 0) + record.amount)
-      for (const share of sharesOf(record, settings)) {
-        burden.set(share.member, (burden.get(share.member) ?? 0) + share.burden)
+      paidMap.set(record.payer, (paidMap.get(record.payer) ?? 0) + record.amount)
+      for (const share of sharesOf(record, memberNames)) {
+        burdenMap.set(share.member, (burdenMap.get(share.member) ?? 0) + share.burden)
       }
     }
 
-    const balances = memberNames.map((member) => ({
+    const names = new Set([...memberNames, ...paidMap.keys(), ...burdenMap.keys()])
+    const balances = [...names].map((member) => ({
       member,
-      balance: (paid.get(member) ?? 0) - (burden.get(member) ?? 0),
+      balance: (paidMap.get(member) ?? 0) - (burdenMap.get(member) ?? 0),
     }))
 
     return {
-      paidTotals: paid,
+      paidTotals: paidMap,
       transfers: simplifyDebts(balances),
       unpaidTotal: unpaid.reduce((sum, r) => sum + r.amount, 0),
+      settledTotal: paid.reduce((sum, r) => sum + r.amount, 0),
+      grandTotal: records.reduce((sum, r) => sum + r.amount, 0),
     }
-  }, [unpaid, memberNames, settings])
+  }, [unpaid, paid, records, memberNames])
 
   const visible = useMemo(() => {
-    const filtered = filter === 'unpaid' ? unpaid : records
-    return [...filtered].sort((a, b) => {
+    const base = filter === 'unpaid' ? unpaid : filter === 'paid' ? paid : records
+    return [...base].sort((a, b) => {
       const diff = b.date.localeCompare(a.date)
       return sort === 'desc' ? diff : -diff
     })
-  }, [records, unpaid, filter, sort])
+  }, [records, unpaid, paid, filter, sort])
 
   const toggleStatus = async (record: SplitRecord) => {
     setBusy(true)
@@ -124,40 +127,80 @@ export default function SplitClient({
     <div className="flex flex-col gap-6">
       {/* 未精算サマリー */}
       <Card className="glow">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="eyebrow">Unsettled</div>
-            <div className="mt-2">
+        <div className="flex items-start gap-3">
+          <IconFrame tone="marine">
+            <IconUsers size={17} />
+          </IconFrame>
+          <div className="min-w-0 flex-1">
+            <div className="eyebrow">未精算の合計</div>
+            <div className="mt-1.5">
               <Amount value={unpaidTotal} size="xl" tone="marine" />
             </div>
-            <p className="mt-2 text-xs text-fg-mute">{unpaid.length} 件の未精算</p>
+            <p className="mt-1 text-xs text-fg-mute">{unpaid.length}件の割り勘が未精算です</p>
           </div>
-          <Link
-            href="/split/members"
-            className="inline-flex items-center gap-1 text-[12px] text-fg-dim hover:text-marine"
-          >
-            <IconUser size={15} />
-            メンバー
-            <IconChevronRight size={13} />
-          </Link>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-4 sm:grid-cols-3">
-          {memberNames.map((member) => (
-            <div key={member} className="rounded-xl border border-line bg-white/[0.02] p-3">
-              <div className="truncate text-[11px] text-marine">{member}</div>
-              <div className="mt-1 text-[10px] text-fg-mute">立替合計</div>
-              <div className="tnum mt-0.5 text-lg font-semibold">
-                {yen(paidTotals.get(member) ?? 0)}
-              </div>
-            </div>
-          ))}
+        <div className="mt-4 border-t border-line pt-4">
+          <ProgressBar
+            value={settledTotal}
+            max={grandTotal}
+            label="支払い状況"
+            caption={`${yen(settledTotal)} / ${yen(grandTotal)}`}
+          />
         </div>
       </Card>
 
+      {/* メンバー */}
+      <div>
+        <SectionLabel
+          action={
+            <Link
+              href="/split/members"
+              className="inline-flex items-center gap-1 text-[12px] text-fg-dim hover:text-marine"
+            >
+              編集
+              <IconChevronRight size={13} />
+            </Link>
+          }
+        >
+          メンバー
+        </SectionLabel>
+        <Card>
+          {members.length === 0 ? (
+            <p className="text-[13px] text-fg-mute">
+              メンバーが未登録です。「編集」から追加してください。
+            </p>
+          ) : (
+            <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
+              {members.map((m) => (
+                <div key={m.id} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
+                  <Avatar name={m.name} selected={m.is_self} />
+                  <span className="w-full truncate text-center text-[11px] text-fg-dim">
+                    {m.is_self ? 'あなた' : m.name}
+                  </span>
+                  <span className="tnum text-center text-[11px] text-fg-mute">
+                    {yen(paidTotals.get(m.name) ?? 0)}
+                  </span>
+                </div>
+              ))}
+              <Link
+                href="/split/members"
+                aria-label="メンバーを追加"
+                className="flex w-16 shrink-0 flex-col items-center gap-1.5"
+              >
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-dashed border-line text-fg-mute">
+                  <IconPlus size={17} />
+                </span>
+                <span className="text-[11px] text-fg-mute">追加</span>
+              </Link>
+            </div>
+          )}
+        </Card>
+      </div>
+
       {/* 精算 */}
       <div>
-        <SectionLabel>Settlement</SectionLabel>
+        <SectionLabel>精算</SectionLabel>
         {transfers.length === 0 ? (
           <Card>
             <p className="text-center text-sm text-teal">精算は不要です</p>
@@ -167,9 +210,11 @@ export default function SplitClient({
             {transfers.map((t) => (
               <Card key={`${t.from}-${t.to}-${t.amount}`}>
                 <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0 text-sm">
+                  <div className="flex min-w-0 items-center gap-2 text-sm">
+                    <Avatar name={t.from} size={26} />
                     <span className="truncate">{t.from}</span>
-                    <span className="mx-2 text-fg-mute">→</span>
+                    <span className="text-fg-mute">→</span>
+                    <Avatar name={t.to} size={26} />
                     <span className="truncate">{t.to}</span>
                   </div>
                   <Amount value={t.amount} size="md" tone="marine" />
@@ -187,7 +232,7 @@ export default function SplitClient({
         )}
       </div>
 
-      {/* 一覧 */}
+      {/* 支出一覧 */}
       <div>
         <SectionLabel
           action={
@@ -204,30 +249,30 @@ export default function SplitClient({
             </button>
           }
         >
-          Records
+          支出一覧
         </SectionLabel>
 
-        <div className="mb-3 flex gap-2">
-          <div className="flex-1">
-            <Segmented
-              value={filter}
-              options={[
-                { id: 'all', label: 'すべて' },
-                { id: 'unpaid', label: '未精算のみ' },
-              ]}
-              onChange={setFilter}
-            />
-          </div>
-          <div className="flex-1">
-            <Segmented
-              value={sort}
-              options={[
-                { id: 'desc', label: '新しい順' },
-                { id: 'asc', label: '古い順' },
-              ]}
-              onChange={setSort}
-            />
-          </div>
+        <div className="mb-3">
+          <PillTabs
+            value={filter}
+            options={[
+              { id: 'unpaid', label: `未精算 (${unpaid.length})` },
+              { id: 'all', label: 'すべて' },
+              { id: 'paid', label: `完了 (${paid.length})` },
+            ]}
+            onChange={setFilter}
+          />
+        </div>
+
+        <div className="mb-3">
+          <Segmented
+            value={sort}
+            options={[
+              { id: 'desc', label: '新しい順' },
+              { id: 'asc', label: '古い順' },
+            ]}
+            onChange={setSort}
+          />
         </div>
 
         {visible.length === 0 ? (
@@ -239,52 +284,66 @@ export default function SplitClient({
           <div className="flex flex-col gap-2">
             {visible.map((record) => (
               <Card key={record.id} className="!p-3.5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-[11px] text-fg-mute">
+                <div className="flex items-start gap-3">
+                  <IconFrame>
+                    <CategoryIcon category={record.category} />
+                  </IconFrame>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm">{record.content}</div>
+                    <div className="mt-1 truncate text-[11px] text-fg-mute">
                       <span className="tnum">{shortDate(record.date)}</span>
-                      <span>{categoryLabel(record.category)}</span>
-                      <StatusPill tone={record.status === 'unpaid' ? 'warn' : 'done'}>
-                        {record.status === 'unpaid' ? 'unsettled' : 'settled'}
-                      </StatusPill>
+                      {' / '}
+                      {categoryLabel(record.category)}
+                      {' / '}
+                      {record.payer} が立替
                     </div>
-                    <div className="mt-1 truncate text-sm">{record.content}</div>
-                    <p className="mt-1 truncate text-[11px] text-fg-mute">
-                      {record.payer} が立替 / {record.member_count}人
-                      {record.shares?.length
-                        ? ` / ${record.shares.map((s) => `${s.member} ${yen(s.burden)}`).join('・')}`
-                        : ''}
-                    </p>
                   </div>
 
-                  <div className="flex shrink-0 flex-col items-end gap-2">
-                    <Amount value={record.amount} size="sm" />
-                    <div className="flex gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => toggleStatus(record)}
-                        disabled={busy}
-                        className="h-9 rounded-lg border border-line px-2.5 text-[11px] text-fg-mute transition-colors hover:border-marine/50 hover:text-marine disabled:opacity-40"
-                      >
-                        {record.status === 'unpaid' ? '精算済みにする' : '未精算に戻す'}
-                      </button>
-                      <IconButton
-                        label="編集"
-                        onClick={() => {
-                          setEditing(record)
-                          setSheetOpen(true)
-                        }}
-                      >
-                        <IconEdit size={15} />
-                      </IconButton>
-                      <IconButton
-                        label="削除"
-                        onClick={() => remove(record)}
-                        className="hover:border-danger/50 hover:text-danger"
-                      >
-                        <IconTrash size={15} />
-                      </IconButton>
-                    </div>
+                  <Amount value={record.amount} size="sm" />
+                </div>
+
+                <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3">
+                  <div className="flex min-w-0 items-center gap-1">
+                    {sharesOf(record, memberNames)
+                      .slice(0, 4)
+                      .map((s) => (
+                        <Avatar key={s.member} name={s.member} size={22} />
+                      ))}
+                    {record.member_count > 4 ? (
+                      <span className="text-[11px] text-fg-mute">+{record.member_count - 4}</span>
+                    ) : null}
+                  </div>
+
+                  <div className="flex shrink-0 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => toggleStatus(record)}
+                      disabled={busy}
+                      className={`h-9 rounded-lg border px-3 text-[11px] whitespace-nowrap transition-colors disabled:opacity-40 ${
+                        record.status === 'unpaid'
+                          ? 'border-line text-fg-mute hover:border-marine/50 hover:text-marine'
+                          : 'border-teal/40 text-teal'
+                      }`}
+                    >
+                      {record.status === 'unpaid' ? '精算する' : '完了'}
+                    </button>
+                    <IconButton
+                      label="編集"
+                      onClick={() => {
+                        setEditing(record)
+                        setSheetOpen(true)
+                      }}
+                    >
+                      <IconEdit size={15} />
+                    </IconButton>
+                    <IconButton
+                      label="削除"
+                      onClick={() => remove(record)}
+                      className="hover:border-danger/50 hover:text-danger"
+                    >
+                      <IconTrash size={15} />
+                    </IconButton>
                   </div>
                 </div>
               </Card>
@@ -296,7 +355,7 @@ export default function SplitClient({
       {sheetOpen ? (
         <SplitSheet
           record={editing}
-          settings={settings}
+          members={members}
           userId={userId}
           onClose={() => {
             setSheetOpen(false)

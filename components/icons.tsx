@@ -218,3 +218,158 @@ export function IconSpark(props: IconProps) {
     </Icon>
   )
 }
+
+export function IconWallet(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3.8 8.2a2.4 2.4 0 0 1 2.4-2.4h11.6a2.4 2.4 0 0 1 2.4 2.4v8.6a2.4 2.4 0 0 1-2.4 2.4H6.2a2.4 2.4 0 0 1-2.4-2.4Z" />
+      <path d="M3.8 10.6h5a2 2 0 0 1 0 4h-5" />
+    </Icon>
+  )
+}
+
+export function IconUsers(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="9.2" cy="8.4" r="3.2" />
+      <path d="M3.4 19.4a5.8 5.8 0 0 1 11.6 0" />
+      <path d="M16 5.6a3.2 3.2 0 0 1 0 6" />
+      <path d="M17.6 14.2a5.8 5.8 0 0 1 3 5.2" />
+    </Icon>
+  )
+}
+
+export function IconClock(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8.4" />
+      <path d="M12 7.2V12l3.2 2" />
+    </Icon>
+  )
+}
+
+export function IconBell(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6.4 10.2a5.6 5.6 0 0 1 11.2 0c0 4 1.4 5.6 1.4 5.6H5c0 0 1.4-1.6 1.4-5.6Z" />
+      <path d="M10.2 18.6a2 2 0 0 0 3.6 0" />
+    </Icon>
+  )
+}
+
+export function IconArrowLeft(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M19 12H5" />
+      <path d="m10.6 6.4-5.6 5.6 5.6 5.6" />
+    </Icon>
+  )
+}
+
+export function IconTrendUp(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 17.2 10 11l3.4 3L20 7.4" />
+      <path d="M15 7.4h5v5" />
+    </Icon>
+  )
+}
+
+export function IconTrendDown(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 7.4 10 13.6l3.4-3L20 17.2" />
+      <path d="M15 17.2h5v-5" />
+    </Icon>
+  )
+}
+
+export function IconTarget(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8.2" />
+      <circle cx="12" cy="12" r="4.4" />
+      <circle cx="12" cy="12" r="1" />
+    </Icon>
+  )
+}
+
+export function IconFlame(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3.6s4.8 3.4 4.8 7.9a4.8 4.8 0 0 1-9.6 0c0-1.5.7-2.8 1.5-3.8.3 1.1 1 1.9 1.8 1.9 1.1 0 1.5-1 1.5-2.4 0-1.3-.4-2.4-.4-2.4Z" />
+      <path d="M12 20.4a4.8 4.8 0 0 0 4.8-4.8" />
+    </Icon>
+  )
+}
+
+export function IconBaseball(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8.4" />
+      <path d="M6.1 6.1c2.4 2 3.6 4.4 3.6 5.9s-1.2 3.9-3.6 5.9" />
+      <path d="M17.9 6.1c-2.4 2-3.6 4.4-3.6 5.9s1.2 3.9 3.6 5.9" />
+    </Icon>
+  )
+}
+
+export function IconTicket(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 8.4a1.6 1.6 0 0 1 1.6-1.6h12.8A1.6 1.6 0 0 1 20 8.4v2a2 2 0 0 0 0 3.2v2a1.6 1.6 0 0 1-1.6 1.6H5.6A1.6 1.6 0 0 1 4 15.6v-2a2 2 0 0 0 0-3.2Z" />
+      <path d="M14 7.6v8.8" />
+    </Icon>
+  )
+}
+
+export function IconFood(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6.4 3.8v6a2.4 2.4 0 0 0 4.8 0v-6" />
+      <path d="M8.8 3.8v16.4" />
+      <path d="M17.2 3.8c-1.5 1.2-2.2 3-2.2 5.2s.7 2.8 2.2 2.8v8.4" />
+    </Icon>
+  )
+}
+
+export function IconBeer(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6.6 8h8.2v11.2a1.2 1.2 0 0 1-1.2 1.2H7.8a1.2 1.2 0 0 1-1.2-1.2Z" />
+      <path d="M14.8 10.4h2.4a2.4 2.4 0 0 1 0 4.8h-2.4" />
+      <path d="M6.6 8a2.6 2.6 0 0 1 2.6-2.6 2.4 2.4 0 0 1 4.4-.8 2.2 2.2 0 0 1 1.2 3.4" />
+    </Icon>
+  )
+}
+
+export function IconGoods(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5.2 8.4h13.6l-1.1 11a1.4 1.4 0 0 1-1.4 1.2H7.7a1.4 1.4 0 0 1-1.4-1.2Z" />
+      <path d="M9 10.4V7a3 3 0 0 1 6 0v3.4" />
+    </Icon>
+  )
+}
+
+export function IconTransport(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="5.4" y="3.8" width="13.2" height="12.6" rx="2.4" />
+      <path d="M5.4 11.4h13.2" />
+      <path d="m7.4 16.4-2 3.8" />
+      <path d="m16.6 16.4 2 3.8" />
+      <path d="M9 14.2h.01" />
+      <path d="M15 14.2h.01" />
+    </Icon>
+  )
+}
+
+export function IconDots(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="5.4" cy="12" r="1.2" />
+      <circle cx="12" cy="12" r="1.2" />
+      <circle cx="18.6" cy="12" r="1.2" />
+    </Icon>
+  )
+}

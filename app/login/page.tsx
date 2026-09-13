@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button, Field, Segmented, inputClass } from '@/components/ui'
-import { APP_NAME, TEAM_NAME } from '@/lib/constants'
+import Brand from '@/components/Brand'
+import { TEAM_NAME } from '@/lib/constants'
 
 type Mode = 'signin' | 'signup'
 
@@ -52,13 +53,16 @@ export default function LoginPage() {
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-6 py-12">
-      <div className="mb-10 text-center">
+      <div className="mb-10 flex flex-col items-center text-center">
         <p className="eyebrow">{TEAM_NAME}</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-[0.14em]">{APP_NAME}</h1>
-        <p className="mt-4 text-[13px] leading-relaxed text-fg-mute">
-          マリーンズを応援する毎日を、
-          <br />
-          記録し、つなぎ、未来へ積み立てる。
+        <div className="mt-4">
+          <Brand size="lg" withTagline />
+        </div>
+        <p className="mt-6 text-[15px] leading-relaxed font-medium">
+          好きが、未来をつくる。
+        </p>
+        <p className="mt-2 text-[13px] leading-relaxed text-fg-mute">
+          野球を、もっと特別な毎日に。
         </p>
       </div>
 

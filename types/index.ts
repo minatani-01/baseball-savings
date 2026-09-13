@@ -37,7 +37,11 @@ export type Game = {
   /** 満塁HRを含まない本塁打数 */
   home_runs: number
   grand_slams: number
+  /** マルチ安打を記録した選手数 */
+  multi_hits: number
+  rbi: number
   pitching_highlight: PitchingHighlight
+  is_winning_pitcher: boolean
   has_save: boolean
   source: 'manual' | 'npb'
   created_by: string | null
@@ -51,10 +55,16 @@ export type BreakdownLine = {
   amount: number
 }
 
+export type SavingKind = 'game' | 'custom'
+
 export type SavingEntry = {
   id: string
   user_id: string
-  game_id: string
+  /** kind='custom' のときは null */
+  game_id: string | null
+  kind: SavingKind
+  /** カスタム貯金の内容。試合貯金では空文字 */
+  title: string
   entry_date: string
   /** 'YYYY-MM'（DB側の生成列） */
   month: string
@@ -66,8 +76,8 @@ export type SavingEntry = {
   updated_at: string
 }
 
-/** 試合と自分の積立予定額を結合したビュー用の型 */
-export type SavingEntryWithGame = SavingEntry & { game: Game }
+/** 試合を結合した積立。カスタム貯金では game が null になる */
+export type SavingEntryRow = SavingEntry & { game: Game | null }
 
 export type SavingRules = {
   user_id?: string
@@ -77,16 +87,21 @@ export type SavingRules = {
   sayonara_bonus: number
   home_run_amount: number
   grand_slam_amount: number
+  multi_hit_amount: number
+  rbi_amount: number
   perfect_game_amount: number
   no_hitter_amount: number
   shutout_amount: number
   complete_game_amount: number
   quality_start_amount: number
+  winning_pitcher_amount: number
   save_amount: number
   multiplier_regular: number
   multiplier_interleague: number
   multiplier_cs: number
   multiplier_nippon_series: number
+  /** 月間の目標貯金額。0 は未設定 */
+  monthly_goal_amount: number
 }
 
 export type MonthlyStatus = 'calculating' | 'ready' | 'deposit_pending' | 'deposited'
@@ -106,11 +121,20 @@ export type MonthlySaving = {
 
 // -------------------------------------------------------------- 割り勘 ----
 export type SplitStatus = 'unpaid' | 'paid'
-export type FilterStatus = 'all' | 'unpaid'
+export type SplitFilter = 'unpaid' | 'all' | 'paid'
 export type SortOrder = 'desc' | 'asc'
 export type SplitType = 'equal' | 'ratio' | 'amount'
-export type MemberCount = 2 | 3
 export type ExpenseCategory = 'ticket' | 'food' | 'beer' | 'goods' | 'transport' | 'other'
+
+export type SplitMember = {
+  id: string
+  user_id: string
+  name: string
+  is_self: boolean
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
 
 export type Share = {
   member: string
@@ -129,7 +153,8 @@ export type SplitRecord = {
   payer: string
   status: SplitStatus
   split_type: SplitType
-  member_count: MemberCount
+  /** 参加人数。shares.length と一致する（2以上） */
+  member_count: number
   shares: Share[]
   category: ExpenseCategory
   game_id: string | null
@@ -137,6 +162,7 @@ export type SplitRecord = {
   updated_at: string
 }
 
+/** 旧2人固定時代の設定。split_members へ移行済みだが読み取り互換のため残す */
 export type MemberSettings = {
   id?: string
   user_id?: string

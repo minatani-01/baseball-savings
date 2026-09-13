@@ -7,17 +7,31 @@ import {
   Amount,
   Button,
   Card,
+  DeltaBadge,
   EmptyState,
   IconButton,
+  IconFrame,
+  PillTabs,
+  ProgressBar,
   Row,
   SectionLabel,
+  Segmented,
   StatusPill,
 } from '@/components/ui'
-import { IconChevronRight, IconEdit, IconPlus, IconRules, IconTrash } from '@/components/icons'
+import {
+  IconBaseball,
+  IconChevronRight,
+  IconEdit,
+  IconRules,
+  IconSpark,
+  IconTrash,
+} from '@/components/icons'
 import { CopyAmountButton, OpenAppButton } from '@/components/HandoffActions'
 import GameSheet from '@/components/savings/GameSheet'
+import CustomSavingSheet from '@/components/savings/CustomSavingSheet'
 import { createClient } from '@/lib/supabase/client'
 import { BREAKDOWN_GROUP_LABEL, groupBreakdown } from '@/lib/savings'
+import { goalProgress, monthOverMonth } from '@/lib/insights'
 import { currentMonth, monthLabel, monthLabelEn, shortDate, yen } from '@/lib/format'
 import {
   MONTHLY_STATUS_LABEL,
@@ -26,7 +40,7 @@ import {
   pitchingHighlightLabel,
   resultLabel,
 } from '@/lib/constants'
-import type { MonthlySaving, MonthlyStatus, SavingEntryWithGame, SavingRules } from '@/types'
+import type { MonthlySaving, MonthlyStatus, SavingEntryRow, SavingRules } from '@/types'
 
 const STATUS_TONE: Record<MonthlyStatus, 'neutral' | 'marine' | 'warn' | 'done'> = {
   calculating: 'neutral',
@@ -35,6 +49,8 @@ const STATUS_TONE: Record<MonthlyStatus, 'neutral' | 'marine' | 'warn' | 'done'>
   deposited: 'done',
 }
 
+type SheetMode = 'game' | 'custom'
+
 export default function SavingsClient({
   userId,
   entries,
@@ -42,13 +58,14 @@ export default function SavingsClient({
   rules,
 }: {
   userId: string
-  entries: SavingEntryWithGame[]
+  entries: SavingEntryRow[]
   monthlySavings: MonthlySaving[]
   rules: SavingRules
 }) {
   const router = useRouter()
-  const [sheetEntry, setSheetEntry] = useState<SavingEntryWithGame | null>(null)
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheetMode, setSheetMode] = useState<SheetMode | null>(null)
+  const [editing, setEditing] = useState<SavingEntryRow | null>(null)
+  const [addMode, setAddMode] = useState<SheetMode>('game')
   const [busy, setBusy] = useState(false)
 
   const months = useMemo(() => {
@@ -60,6 +77,7 @@ export default function SavingsClient({
   const [month, setMonth] = useState(() => months[0] ?? currentMonth())
 
   const total = useMemo(() => entries.reduce((sum, e) => sum + e.amount, 0), [entries])
+  const delta = useMemo(() => monthOverMonth(entries, month), [entries, month])
 
   const monthEntries = useMemo(
     () =>
@@ -73,6 +91,8 @@ export default function SavingsClient({
     () => monthEntries.reduce((sum, e) => sum + e.amount, 0),
     [monthEntries]
   )
+
+  const goal = goalProgress(monthTotal, rules.monthly_goal_amount)
 
   const groups = useMemo(() => {
     const totals: Record<string, number> = { result: 0, batting: 0, pitching: 0, other: 0 }
@@ -98,7 +118,7 @@ export default function SavingsClient({
     router.refresh()
   }
 
-  const removeEntry = async (entry: SavingEntryWithGame) => {
+  const removeEntry = async (entry: SavingEntryRow) => {
     if (!window.confirm(`${shortDate(entry.entry_date)} の記録を削除しますか？`)) return
     setBusy(true)
     const supabase = createClient()
@@ -107,20 +127,29 @@ export default function SavingsClient({
     router.refresh()
   }
 
+  const openAdd = () => {
+    setEditing(null)
+    setSheetMode(addMode)
+  }
+
+  const closeSheet = () => {
+    setSheetMode(null)
+    setEditing(null)
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* 累計 */}
       <Card className="glow">
         <div className="eyebrow">Total lotte savings</div>
-        <div className="mt-2">
+        <div className="mt-2 flex items-baseline gap-3">
           <Amount value={total} size="xl" tone="marine" />
+          <DeltaBadge percent={delta} />
         </div>
-        <p className="mt-2 text-xs text-fg-mute">
-          {entries.length} Games / 記録済みの全試合合計
-        </p>
+        <p className="mt-2 text-xs text-fg-mute">{entries.length} 件の記録</p>
       </Card>
 
-      {/* 月選択 */}
+      {/* 貯金する */}
       <div>
         <SectionLabel
           action={
@@ -134,24 +163,39 @@ export default function SavingsClient({
             </Link>
           }
         >
-          Monthly
+          貯金する
         </SectionLabel>
+        <Card>
+          <Segmented
+            value={addMode}
+            options={[
+              { id: 'game', label: '試合登録' },
+              { id: 'custom', label: 'カスタム貯金' },
+            ]}
+            onChange={(v) => setAddMode(v as SheetMode)}
+          />
+          <p className="mt-3 text-[11px] leading-relaxed text-fg-mute">
+            {addMode === 'game'
+              ? '試合結果を登録すると、貯金ルールに沿って積立予定額を自動計算します。'
+              : '試合に紐づかない任意の金額を積み立てます。フェーズ倍率は適用されません。'}
+          </p>
+          <Button variant="primary" full className="mt-3" onClick={openAdd}>
+            {addMode === 'game' ? '試合を登録する' : 'カスタム貯金を追加する'}
+            <IconChevronRight size={16} />
+          </Button>
+        </Card>
+      </div>
 
-        <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 pb-1">
-          {months.map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMonth(m)}
-              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[12px] transition-colors ${
-                m === month
-                  ? 'border-marine/70 bg-marine/10 text-marine'
-                  : 'border-line text-fg-mute hover:text-fg-dim'
-              }`}
-            >
-              {monthLabel(m)}
-            </button>
-          ))}
+      {/* 月選択 */}
+      <div>
+        <SectionLabel>Monthly</SectionLabel>
+
+        <div className="mb-3">
+          <PillTabs
+            value={month}
+            options={months.map((m) => ({ id: m, label: monthLabel(m) }))}
+            onChange={setMonth}
+          />
         </div>
 
         <Card>
@@ -162,7 +206,7 @@ export default function SavingsClient({
                 <Amount value={displayAmount} size="lg" tone="marine" />
               </div>
               <p className="mt-1 text-xs text-fg-mute">
-                {monthEntries.length} Games
+                {monthEntries.length} 件
                 {status !== 'calculating' && confirmed !== null && confirmed !== monthTotal
                   ? ` / 集計値 ${yen(monthTotal)}`
                   : ''}
@@ -170,6 +214,17 @@ export default function SavingsClient({
             </div>
             <StatusPill tone={STATUS_TONE[status]}>{MONTHLY_STATUS_LABEL[status]}</StatusPill>
           </div>
+
+          {goal.percent !== null ? (
+            <div className="mt-4 border-t border-line pt-4">
+              <ProgressBar
+                value={goal.current}
+                max={goal.goal}
+                label="目標金額"
+                caption={`${yen(goal.current)} / ${yen(goal.goal)}`}
+              />
+            </div>
+          ) : null}
 
           {monthEntries.length > 0 ? (
             <div className="mt-4 divide-hairline border-t border-line pt-1">
@@ -209,11 +264,7 @@ export default function SavingsClient({
                   <CopyAmountButton amount={displayAmount} label={`${yen(displayAmount)}をコピー`} />
                   <OpenAppButton app="onebank" />
                 </div>
-                <Button
-                  full
-                  disabled={busy}
-                  onClick={() => updateMonthly({ status: 'deposit_pending' })}
-                >
+                <Button full disabled={busy} onClick={() => updateMonthly({ status: 'deposit_pending' })}>
                   入金手続き中にする
                 </Button>
                 <Button
@@ -272,62 +323,63 @@ export default function SavingsClient({
         </Card>
       </div>
 
-      {/* 試合一覧 */}
+      {/* 記録一覧 */}
       <div>
-        <SectionLabel
-          action={
-            <button
-              type="button"
-              onClick={() => {
-                setSheetEntry(null)
-                setSheetOpen(true)
-              }}
-              className="inline-flex items-center gap-1.5 text-[12px] text-marine"
-            >
-              <IconPlus size={15} />
-              試合を記録
-            </button>
-          }
-        >
-          Games
-        </SectionLabel>
+        <SectionLabel>Records</SectionLabel>
 
         {monthEntries.length === 0 ? (
           <EmptyState
             title="この月の記録はまだありません"
-            description="試合結果を登録すると、貯金ルールに沿って積立予定額が計算されます。"
+            description="試合を登録するか、カスタム貯金で任意の金額を積み立ててください。"
           />
         ) : (
           <div className="flex flex-col gap-2">
             {monthEntries.map((entry) => {
               const g = entry.game
-              const details = [
-                g.home_runs > 0 ? `HR ${g.home_runs}` : null,
-                g.grand_slams > 0 ? `満塁HR ${g.grand_slams}` : null,
-                g.pitching_highlight !== 'none' ? pitchingHighlightLabel(g.pitching_highlight) : null,
-                g.has_save ? 'セーブ' : null,
-                entry.other_note ? entry.other_note : null,
-              ].filter(Boolean)
+              const details = g
+                ? [
+                    g.home_runs > 0 ? `HR ${g.home_runs}` : null,
+                    g.grand_slams > 0 ? `満塁HR ${g.grand_slams}` : null,
+                    g.multi_hits > 0 ? `マルチ安打 ${g.multi_hits}` : null,
+                    g.rbi > 0 ? `打点 ${g.rbi}` : null,
+                    g.pitching_highlight !== 'none'
+                      ? pitchingHighlightLabel(g.pitching_highlight)
+                      : null,
+                    g.is_winning_pitcher ? '勝利投手' : null,
+                    g.has_save ? 'セーブ' : null,
+                    entry.other_note || null,
+                  ].filter(Boolean)
+                : [entry.other_note || null].filter(Boolean)
 
               return (
                 <Card key={entry.id} className="!p-3.5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                  <div className="flex items-start gap-3">
+                    <IconFrame tone="marine">
+                      {g ? <IconBaseball size={17} /> : <IconSpark size={17} />}
+                    </IconFrame>
+
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 text-[11px] text-fg-mute">
                         <span className="tnum">{shortDate(entry.entry_date)}</span>
-                        {g.phase !== 'regular' ? <span>{phaseLabel(g.phase)}</span> : null}
-                        <span>{g.home_away === 'home' ? 'H' : 'A'}</span>
+                        {g && g.phase !== 'regular' ? <span>{phaseLabel(g.phase)}</span> : null}
+                        {g ? <span>{g.home_away === 'home' ? 'H' : 'A'}</span> : <span>カスタム</span>}
                       </div>
                       <div className="mt-1 truncate text-sm">
-                        {resultLabel(g.result, g.is_sayonara)}
-                        <span className="text-fg-mute"> vs </span>
-                        {opponentLabel(g.opponent)}
-                        {g.marines_score !== null && g.opponent_score !== null ? (
-                          <span className="tnum text-fg-mute">
-                            {' '}
-                            {g.marines_score}-{g.opponent_score}
-                          </span>
-                        ) : null}
+                        {g ? (
+                          <>
+                            {resultLabel(g.result, g.is_sayonara)}
+                            <span className="text-fg-mute"> vs </span>
+                            {opponentLabel(g.opponent)}
+                            {g.marines_score !== null && g.opponent_score !== null ? (
+                              <span className="tnum text-fg-mute">
+                                {' '}
+                                {g.marines_score}-{g.opponent_score}
+                              </span>
+                            ) : null}
+                          </>
+                        ) : (
+                          entry.title
+                        )}
                       </div>
                       {details.length > 0 ? (
                         <p className="mt-1 truncate text-[11px] text-fg-mute">{details.join(' / ')}</p>
@@ -340,8 +392,8 @@ export default function SavingsClient({
                         <IconButton
                           label="編集"
                           onClick={() => {
-                            setSheetEntry(entry)
-                            setSheetOpen(true)
+                            setEditing(entry)
+                            setSheetMode(entry.kind === 'custom' ? 'custom' : 'game')
                           }}
                         >
                           <IconEdit size={15} />
@@ -363,16 +415,11 @@ export default function SavingsClient({
         )}
       </div>
 
-      {sheetOpen ? (
-        <GameSheet
-          entry={sheetEntry}
-          rules={rules}
-          userId={userId}
-          onClose={() => {
-            setSheetOpen(false)
-            setSheetEntry(null)
-          }}
-        />
+      {sheetMode === 'game' ? (
+        <GameSheet entry={editing} rules={rules} userId={userId} onClose={closeSheet} />
+      ) : null}
+      {sheetMode === 'custom' ? (
+        <CustomSavingSheet entry={editing} userId={userId} onClose={closeSheet} />
       ) : null}
     </div>
   )

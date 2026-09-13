@@ -5,8 +5,9 @@ import type {
   MemberSettings,
   MonthlySaving,
   Profile,
-  SavingEntryWithGame,
+  SavingEntryRow,
   SavingRules,
+  SplitMember,
   SplitRecord,
 } from '@/types'
 
@@ -44,7 +45,7 @@ export async function getSavingRules(userId: string): Promise<SavingRules> {
   }
 }
 
-export async function getSavingEntries(userId: string): Promise<SavingEntryWithGame[]> {
+export async function getSavingEntries(userId: string): Promise<SavingEntryRow[]> {
   const supabase = await createClient()
   const { data } = await supabase
     .from('saving_entries')
@@ -52,7 +53,10 @@ export async function getSavingEntries(userId: string): Promise<SavingEntryWithG
     .eq('user_id', userId)
     .order('entry_date', { ascending: false })
 
-  return ((data ?? []) as SavingEntryWithGame[]).filter((entry) => Boolean(entry.game))
+  // kind='custom' は game が null。試合貯金なのに game が取れない行だけを除外する
+  return ((data ?? []) as SavingEntryRow[]).filter(
+    (entry) => entry.kind === 'custom' || Boolean(entry.game)
+  )
 }
 
 export async function getMonthlySavings(userId: string): Promise<MonthlySaving[]> {
@@ -87,6 +91,17 @@ export async function getMemberSettings(userId: string): Promise<MemberSettings>
       member_c: null,
     }
   )
+}
+
+export async function getSplitMembers(userId: string): Promise<SplitMember[]> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('split_members')
+    .select('*')
+    .eq('user_id', userId)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
+  return (data ?? []) as SplitMember[]
 }
 
 /** 直近の共通試合データ（貯金未登録の試合を拾うために使う） */

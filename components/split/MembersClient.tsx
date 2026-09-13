@@ -1,115 +1,145 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Button, Card, Field, inputClass } from '@/components/ui'
-import { IconChevronRight } from '@/components/icons'
+import { Avatar, Button, Card, EmptyState, IconButton, SectionLabel, inputClass } from '@/components/ui'
+import { IconCheck, IconPlus, IconTrash } from '@/components/icons'
 import { createClient } from '@/lib/supabase/client'
-import type { MemberSettings } from '@/types'
+import type { SplitMember } from '@/types'
 
 export default function MembersClient({
   userId,
-  settings,
+  members,
 }: {
   userId: string
-  settings: MemberSettings
+  members: SplitMember[]
 }) {
   const router = useRouter()
-  const [memberA, setMemberA] = useState(settings.member_a)
-  const [memberB, setMemberB] = useState(settings.member_b)
-  const [memberC, setMemberC] = useState(settings.member_c ?? '')
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const save = async () => {
-    if (!memberA.trim() || !memberB.trim()) {
-      setError('メンバーAとBの名前は必須です')
+  const add = async () => {
+    const name = newName.trim()
+    if (!name) return
+    if (members.some((m) => m.name === name)) {
+      setError('同じ名前のメンバーがすでにいます')
       return
     }
-    setSaving(true)
+    setBusy(true)
     setError(null)
     const supabase = createClient()
-    const { error } = await supabase.from('settings').upsert(
-      {
-        user_id: userId,
-        member_a: memberA.trim(),
-        member_b: memberB.trim(),
-        member_c: memberC.trim() || null,
-      },
-      { onConflict: 'user_id' }
-    )
-    setSaving(false)
+    const { error } = await supabase.from('split_members').insert({
+      user_id: userId,
+      name,
+      sort_order: members.length,
+    })
+    setBusy(false)
     if (error) {
-      setError('保存に失敗しました')
+      setError('追加に失敗しました')
       return
     }
-    setSaved(true)
+    setNewName('')
+    router.refresh()
+  }
+
+  const markSelf = async (member: SplitMember) => {
+    setBusy(true)
+    const supabase = createClient()
+    // 「あなた」は1人だけ。まず全員を解除してから対象だけ立てる
+    await supabase.from('split_members').update({ is_self: false }).eq('user_id', userId)
+    if (!member.is_self) {
+      await supabase.from('split_members').update({ is_self: true }).eq('id', member.id)
+    }
+    setBusy(false)
+    router.refresh()
+  }
+
+  const remove = async (member: SplitMember) => {
+    if (
+      !window.confirm(
+        `${member.name} を削除しますか？\n過去の記録に保存された名前と金額はそのまま残ります。`
+      )
+    ) {
+      return
+    }
+    setBusy(true)
+    const supabase = createClient()
+    await supabase.from('split_members').delete().eq('id', member.id)
+    setBusy(false)
     router.refresh()
   }
 
   return (
     <div className="flex flex-col gap-6">
+      <p className="text-[13px] leading-relaxed text-fg-mute">
+        割り勘に参加するメンバーです。人数の上限はありません。
+        名前を変更・削除しても、過去の記録に保存された名前と負担額は変わりません。
+      </p>
+
       <div>
-        <Link
-          href="/split"
-          className="inline-flex items-center gap-1 text-[12px] text-fg-mute hover:text-marine"
-        >
-          <IconChevronRight size={13} className="rotate-180" />
-          割り勘へ戻る
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold tracking-wide">メンバー管理</h1>
-        <p className="mt-2 text-[13px] leading-relaxed text-fg-mute">
-          割り勘に参加するメンバーの表示名です。名前を変更しても過去の記録に保存された名前は変わりません。
-        </p>
+        <SectionLabel>Members</SectionLabel>
+        {members.length === 0 ? (
+          <EmptyState title="メンバーがいません" description="下のフォームから追加してください。" />
+        ) : (
+          <div className="flex flex-col gap-2">
+            {members.map((member) => (
+              <Card key={member.id} className="!p-3">
+                <div className="flex items-center gap-3">
+                  <Avatar name={member.name} selected={member.is_self} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm">{member.name}</div>
+                    {member.is_self ? (
+                      <div className="text-[11px] text-marine">あなた</div>
+                    ) : null}
+                  </div>
+                  <IconButton
+                    label={member.is_self ? '「あなた」を解除' : '「あなた」に設定'}
+                    onClick={() => markSelf(member)}
+                    disabled={busy}
+                    className={member.is_self ? 'border-marine/60 text-marine' : ''}
+                  >
+                    <IconCheck size={15} />
+                  </IconButton>
+                  <IconButton
+                    label="削除"
+                    onClick={() => remove(member)}
+                    disabled={busy}
+                    className="hover:border-danger/50 hover:text-danger"
+                  >
+                    <IconTrash size={15} />
+                  </IconButton>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
 
-      <Card>
-        <div className="flex flex-col gap-4">
-          <Field label="メンバーA">
+      <div>
+        <SectionLabel>メンバーを追加</SectionLabel>
+        <Card>
+          <div className="flex gap-2">
             <input
               type="text"
-              value={memberA}
+              value={newName}
               onChange={(e) => {
-                setMemberA(e.target.value)
-                setSaved(false)
+                setNewName(e.target.value)
+                setError(null)
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') add()
+              }}
+              placeholder="名前"
               className={inputClass}
             />
-          </Field>
-          <Field label="メンバーB">
-            <input
-              type="text"
-              value={memberB}
-              onChange={(e) => {
-                setMemberB(e.target.value)
-                setSaved(false)
-              }}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="メンバーC" hint="3人で割り勘する場合のみ">
-            <input
-              type="text"
-              value={memberC}
-              onChange={(e) => {
-                setMemberC(e.target.value)
-                setSaved(false)
-              }}
-              placeholder="未設定"
-              className={inputClass}
-            />
-          </Field>
-        </div>
-      </Card>
-
-      <div className="flex flex-col gap-2">
-        {error ? <p className="text-[13px] text-danger">{error}</p> : null}
-        {saved ? <p className="text-[13px] text-teal">保存しました</p> : null}
-        <Button variant="primary" full onClick={save} disabled={saving}>
-          {saving ? '保存中' : '保存する'}
-        </Button>
+            <Button onClick={add} disabled={busy || !newName.trim()} className="shrink-0">
+              <IconPlus size={16} />
+              追加
+            </Button>
+          </div>
+          {error ? <p className="mt-2 text-[13px] text-danger">{error}</p> : null}
+        </Card>
       </div>
     </div>
   )

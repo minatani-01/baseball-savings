@@ -28,7 +28,7 @@ import type {
   HomeAway,
   Phase,
   PitchingHighlight,
-  SavingEntryWithGame,
+  SavingEntryRow,
   SavingRules,
 } from '@/types'
 
@@ -44,14 +44,18 @@ type FormState = {
   opponent_score: string
   home_runs: number
   grand_slams: number
+  multi_hits: number
+  rbi: number
   pitching_highlight: PitchingHighlight
+  is_winning_pitcher: boolean
   has_save: boolean
   other_amount: string
   other_note: string
 }
 
-function toForm(entry: SavingEntryWithGame | null): FormState {
-  if (!entry) {
+function toForm(entry: SavingEntryRow | null): FormState {
+  // カスタム貯金（game が null）は GameSheet では編集しないため、新規と同じ初期値にする
+  if (!entry || !entry.game) {
     return {
       game_date: today(),
       opponent: 'fighters',
@@ -64,7 +68,10 @@ function toForm(entry: SavingEntryWithGame | null): FormState {
       opponent_score: '',
       home_runs: 0,
       grand_slams: 0,
+      multi_hits: 0,
+      rbi: 0,
       pitching_highlight: 'none',
+      is_winning_pitcher: false,
       has_save: false,
       other_amount: '0',
       other_note: '',
@@ -83,7 +90,10 @@ function toForm(entry: SavingEntryWithGame | null): FormState {
     opponent_score: g.opponent_score === null ? '' : String(g.opponent_score),
     home_runs: g.home_runs,
     grand_slams: g.grand_slams,
+    multi_hits: g.multi_hits ?? 0,
+    rbi: g.rbi ?? 0,
     pitching_highlight: g.pitching_highlight,
+    is_winning_pitcher: g.is_winning_pitcher ?? false,
     has_save: g.has_save,
     other_amount: String(entry.other_amount ?? 0),
     other_note: entry.other_note ?? '',
@@ -169,7 +179,7 @@ export default function GameSheet({
   userId,
   onClose,
 }: {
-  entry: SavingEntryWithGame | null
+  entry: SavingEntryRow | null
   rules: SavingRules
   userId: string
   onClose: () => void
@@ -193,7 +203,10 @@ export default function GameSheet({
           is_sayonara: form.result === 'win' && form.is_sayonara,
           home_runs: form.home_runs,
           grand_slams: form.grand_slams,
+          multi_hits: form.multi_hits,
+          rbi: form.rbi,
           pitching_highlight: form.pitching_highlight,
+          is_winning_pitcher: form.is_winning_pitcher,
           has_save: form.has_save,
         },
         rules,
@@ -224,7 +237,10 @@ export default function GameSheet({
       opponent_score: toScore(form.opponent_score),
       home_runs: form.home_runs,
       grand_slams: form.grand_slams,
+      multi_hits: form.multi_hits,
+      rbi: form.rbi,
       pitching_highlight: form.pitching_highlight,
+      is_winning_pitcher: form.is_winning_pitcher,
       has_save: form.has_save,
       source: 'manual' as const,
       created_by: userId,
@@ -246,6 +262,8 @@ export default function GameSheet({
       {
         user_id: userId,
         game_id: game.id,
+        kind: 'game',
+        title: '',
         entry_date: form.game_date,
         amount: calc.amount,
         breakdown: calc.lines,
@@ -380,24 +398,40 @@ export default function GameSheet({
           </div>
         </Field>
 
-        <Field label="打撃" hint="満塁HRはホームランに含めず別に数える">
-          <div className="flex gap-3">
-            <Counter
-              label="ホームラン"
-              hint={`+¥${rules.home_run_amount}/本`}
-              value={form.home_runs}
-              onChange={(v) => upd('home_runs', v)}
-            />
-            <Counter
-              label="満塁ホームラン"
-              hint={`+¥${rules.grand_slam_amount}/本`}
-              value={form.grand_slams}
-              onChange={(v) => upd('grand_slams', v)}
-            />
+        <Field label="打撃ボーナス" hint="満塁HRはホームランに含めず別に数える">
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-3">
+              <Counter
+                label="ホームラン"
+                hint={`+¥${rules.home_run_amount}/本`}
+                value={form.home_runs}
+                onChange={(v) => upd('home_runs', v)}
+              />
+              <Counter
+                label="満塁ホームラン"
+                hint={`+¥${rules.grand_slam_amount}/本`}
+                value={form.grand_slams}
+                onChange={(v) => upd('grand_slams', v)}
+              />
+            </div>
+            <div className="flex gap-3">
+              <Counter
+                label="マルチ安打"
+                hint={`+¥${rules.multi_hit_amount}/人`}
+                value={form.multi_hits}
+                onChange={(v) => upd('multi_hits', v)}
+              />
+              <Counter
+                label="打点"
+                hint={`+¥${rules.rbi_amount}/点`}
+                value={form.rbi}
+                onChange={(v) => upd('rbi', v)}
+              />
+            </div>
           </div>
         </Field>
 
-        <Field label="投手" hint="先発ハイライトは最上位のみ加算">
+        <Field label="投手ボーナス" hint="先発ハイライトは最上位のみ加算">
           <div className="flex flex-col gap-2">
             <select
               value={form.pitching_highlight}
@@ -410,6 +444,11 @@ export default function GameSheet({
                 </option>
               ))}
             </select>
+            <Toggle
+              label="勝利投手"
+              checked={form.is_winning_pitcher}
+              onChange={(v) => upd('is_winning_pitcher', v)}
+            />
             <Toggle label="セーブ" checked={form.has_save} onChange={(v) => upd('has_save', v)} />
           </div>
         </Field>

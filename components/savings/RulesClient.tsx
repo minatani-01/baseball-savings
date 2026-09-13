@@ -1,10 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button, Card, SectionLabel } from '@/components/ui'
-import { IconChevronRight } from '@/components/icons'
 import { createClient } from '@/lib/supabase/client'
 import { DEFAULT_SAVING_RULES } from '@/lib/savings'
 import type { SavingRules } from '@/types'
@@ -16,6 +14,7 @@ type AmountKey = Exclude<
   | 'multiplier_interleague'
   | 'multiplier_cs'
   | 'multiplier_nippon_series'
+  | 'monthly_goal_amount'
 >
 
 type MultiplierKey =
@@ -41,6 +40,8 @@ const AMOUNT_SECTIONS: { title: string; note?: string; items: { key: AmountKey; 
     items: [
       { key: 'home_run_amount', label: 'ホームラン（1本あたり）' },
       { key: 'grand_slam_amount', label: '満塁ホームラン（1本あたり）' },
+      { key: 'multi_hit_amount', label: 'マルチ安打（1人あたり）' },
+      { key: 'rbi_amount', label: '打点（1点あたり）' },
     ],
   },
   {
@@ -52,6 +53,7 @@ const AMOUNT_SECTIONS: { title: string; note?: string; items: { key: AmountKey; 
       { key: 'shutout_amount', label: '完封' },
       { key: 'complete_game_amount', label: '完投' },
       { key: 'quality_start_amount', label: 'QS' },
+      { key: 'winning_pitcher_amount', label: '勝利投手' },
       { key: 'save_amount', label: 'セーブ' },
     ],
   },
@@ -115,15 +117,7 @@ export default function RulesClient({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link
-          href="/savings"
-          className="inline-flex items-center gap-1 text-[12px] text-fg-mute hover:text-marine"
-        >
-          <IconChevronRight size={13} className="rotate-180" />
-          貯金へ戻る
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold tracking-wide">貯金ルール</h1>
-        <p className="mt-2 text-[13px] leading-relaxed text-fg-mute">
+        <p className="text-[13px] leading-relaxed text-fg-mute">
           試合ごとの入力を減らし、ここで決めたルールから積立予定額を自動計算します。
           過去に記録済みの試合の金額は、ルールを変更しても書き換わりません。
         </p>
@@ -159,6 +153,40 @@ export default function RulesClient({
           </Card>
         </div>
       ))}
+
+      <div>
+        <SectionLabel>月間の目標金額</SectionLabel>
+        <Card>
+          <p className="mb-3 text-[11px] text-fg-mute">
+            ホームと貯金タブに進捗バーを表示します。0 にすると非表示になります。
+          </p>
+          <div className="flex items-center justify-between gap-4 py-1">
+            <label htmlFor="monthly_goal_amount" className="text-[13px] text-fg-dim">
+              目標金額
+            </label>
+            <div className="flex items-center gap-1.5">
+              <span className="text-fg-mute">¥</span>
+              <input
+                id="monthly_goal_amount"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1000}
+                value={rules.monthly_goal_amount}
+                onChange={(e) => {
+                  const parsed = Number.parseInt(e.target.value, 10)
+                  setRules((prev) => ({
+                    ...prev,
+                    monthly_goal_amount: Number.isFinite(parsed) && parsed >= 0 ? parsed : 0,
+                  }))
+                  setSaved(false)
+                }}
+                className={numberInput}
+              />
+            </div>
+          </div>
+        </Card>
+      </div>
 
       <div>
         <SectionLabel>フェーズ倍率</SectionLabel>

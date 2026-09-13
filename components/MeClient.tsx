@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Card, Field, Row, SectionLabel, inputClass } from '@/components/ui'
-import { IconCheck, IconCopy, IconLink, IconLogout } from '@/components/icons'
+import { IconBell, IconCheck, IconCopy, IconLink, IconLogout } from '@/components/icons'
 import { loadAppLinks, saveAppLinks, type AppLinks } from '@/components/HandoffActions'
 import { createClient } from '@/lib/supabase/client'
 import { EXTERNAL_APPS, type ExternalAppKey } from '@/lib/constants'
@@ -180,6 +180,22 @@ export default function MeClient({
             >
               起動URLを保存
             </Button>
+          </div>
+        </Card>
+      </div>
+
+      <div id="notifications" className="scroll-mt-20">
+        <SectionLabel>お知らせ</SectionLabel>
+        <Card>
+          <div className="flex items-start gap-3">
+            <IconBell size={18} className="mt-0.5 shrink-0 text-fg-mute" />
+            <div>
+              <p className="text-[13px]">通知はまだありません</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
+                試合開始・貯金額確定・月末入金・割り勘の精算依頼などのプッシュ通知は Phase 6
+                で実装予定です。
+              </p>
+            </div>
           </div>
         </Card>
       </div>

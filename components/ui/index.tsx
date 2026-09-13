@@ -289,3 +289,128 @@ export function Row({
     </div>
   )
 }
+
+// ------------------------------------------------------------ Pill tabs ----
+export function PillTabs<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T
+  options: { id: T; label: string }[]
+  onChange: (id: T) => void
+}) {
+  return (
+    <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => onChange(o.id)}
+          aria-pressed={value === o.id}
+          className={`min-h-[38px] shrink-0 rounded-full border px-4 text-[13px] transition-colors ${
+            value === o.id
+              ? 'border-marine/70 bg-marine/12 text-marine font-medium shadow-[0_0_26px_-14px_rgba(34,211,238,0.9)]'
+              : 'border-line text-fg-mute hover:text-fg-dim'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ----------------------------------------------------------- Progress ----
+export function ProgressBar({
+  value,
+  max,
+  label,
+  caption,
+}: {
+  value: number
+  max: number
+  label?: ReactNode
+  caption?: ReactNode
+}) {
+  const percent = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0
+  return (
+    <div>
+      {label || caption ? (
+        <div className="mb-2 flex items-baseline justify-between gap-3">
+          <span className="text-[13px] text-fg-dim">{label}</span>
+          <span className="tnum text-[13px] text-fg">{caption}</span>
+        </div>
+      ) : null}
+      <div
+        className="h-2 w-full overflow-hidden rounded-full bg-white/[0.06]"
+        role="progressbar"
+        aria-valuenow={percent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        <div
+          className="h-full rounded-full bg-marine shadow-[0_0_18px_-4px_rgba(34,211,238,0.9)] transition-[width]"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <div className="tnum mt-1 text-right text-[11px] text-fg-mute">{percent}%</div>
+    </div>
+  )
+}
+
+// ------------------------------------------------------------- Avatar ----
+export function Avatar({
+  name,
+  selected = false,
+  size = 40,
+}: {
+  name: string
+  selected?: boolean
+  size?: number
+}) {
+  const initial = name.trim().slice(0, 1) || '?'
+  return (
+    <span
+      aria-hidden="true"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}
+      className={`inline-flex shrink-0 items-center justify-center rounded-full border font-semibold ${
+        selected
+          ? 'border-marine/70 bg-marine/15 text-marine'
+          : 'border-line bg-white/[0.03] text-fg-dim'
+      }`}
+    >
+      {initial}
+    </span>
+  )
+}
+
+// -------------------------------------------------------------- Delta ----
+export function DeltaBadge({ percent }: { percent: number | null }) {
+  if (percent === null) return null
+  const up = percent >= 0
+  return (
+    <span
+      className={`tnum inline-flex items-center gap-1 text-[12px] font-medium ${
+        up ? 'text-teal' : 'text-danger'
+      }`}
+    >
+      {up ? '\u2191' : '\u2193'}
+      {up ? '+' : ''}
+      {percent}%
+    </span>
+  )
+}
+
+// ---------------------------------------------------------- Icon frame ----
+export function IconFrame({ children, tone = 'default' }: { children: ReactNode; tone?: 'default' | 'marine' }) {
+  return (
+    <span
+      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${
+        tone === 'marine' ? 'border-marine/50 bg-marine/10 text-marine' : 'border-line bg-white/[0.03] text-fg-dim'
+      }`}
+    >
+      {children}
+    </span>
+  )
+}
