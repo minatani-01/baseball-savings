@@ -23,7 +23,7 @@
 | --- | --- | --- |
 | ベースにするコード | 割り勘側のスタック（Next.js 16 / Tailwind v4 / Supabase SSR） | 仕様書39章の推奨構成と一致し、SSR認証・App Router が既に動作していたため。貯金側は画面数が少なく移植コストが低い |
 | リポジトリ | `baseball-savings` を Marine Wallet 本体へ転換 | 既存の公開URLと履歴を活かせる。Vite構成（`src/`, `index.html`, `vite.config.js`）は削除した |
-| Supabase | 「割り勘メモ」プロジェクトを共通DBへ拡張 | 稼働中のプロジェクトを土台にでき、既存の割り勘データ（4件）を移行せずに済む。貯金側は PAUSED で復旧が必要なため移行元とする |
+| Supabase | 「割り勘メモ」プロジェクトを共通DBへ拡張 | 稼働中のプロジェクトを土台にでき、既存の割り勘データ（92件）を移行せずに済む。貯金側は PAUSED で復旧が必要なため移行元とする |
 | 認証 | Supabase Auth（メール/パスワード）に一本化 | 仕様書34章の推奨どおり |
 | データ書き込み | クライアントから RLS 経由で直接実行 | 個人利用規模でAPIルートを二重に持つ必要がないため。整合性は DB の CHECK 制約と RLS で担保する |
 | チャート | 外部ライブラリを使わず SVG 自前描画 | recharts は React 19 との組み合わせで追加検証が必要になる。トンマナ（線幅・発光）も直接制御したい |
@@ -159,7 +159,9 @@ Marine Wallet から送金は行わない。金額をクリップボードへコ
    プロジェクト名は Marine Wallet に変更してよい。
 2. Vercel の環境変数を `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` に差し替える
 3. 旧ロッテ貯金プロジェクト（`uwlnylkkcieqzvrrixjj` / PAUSED）を Restore し、`games` を CSV エクスポートする
-   - Restore すると稼働プロジェクトが3つになるため、Supabase の無料枠を超えないか確認すること
+   - **注意**: 組織は Free プランで、現在 `割り勘メモ` と `relay` の2プロジェクトが稼働中。
+     Free プランの稼働プロジェクト数上限に達しているため、Restore の前に `relay` を一時停止するか、
+     プランを上げる必要がある。CSV を取得したら旧プロジェクトは再び Pause してよい
 4. `0002_import_legacy_games.sql` の手順に従って取り込む
 5. 取り込み結果を確認したら、旧プロジェクトを削除または PAUSED に戻す
 
