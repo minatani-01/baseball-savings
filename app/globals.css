@@ -1,0 +1,119 @@
+@import 'tailwindcss';
+
+/* ==========================================================================
+   Marine Wallet Design Tokens
+   Near Future × Fintech × Baseball × Marine
+   - ダークモード主体 / ガラス質 / 細いボーダー / 微細な発光 / 広い余白
+   - UIに絵文字は使用しない（アイコンはすべて SVG ラインアイコン）
+   ========================================================================== */
+@theme inline {
+  --color-ink: #05070b;
+  --color-ink-2: #090d14;
+  --color-surface: #0e1420;
+  --color-line: #1c2534;
+  --color-line-soft: #141b27;
+  --color-fg: #e6edf3;
+  --color-fg-dim: #9fb0c0;
+  --color-fg-mute: #6b7c8d;
+  --color-marine: #22d3ee;
+  --color-marine-deep: #0e7490;
+  --color-teal: #2dd4bf;
+  --color-danger: #f2647a;
+  --color-warn: #f0b840;
+}
+
+:root {
+  color-scheme: dark;
+  --shadow-glow: 0 0 60px -28px rgba(34, 211, 238, 0.75);
+  --shadow-card: 0 18px 40px -32px rgba(0, 0, 0, 0.9);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  min-height: 100dvh;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1100px 620px at 50% -18%, rgba(34, 211, 238, 0.14), transparent 62%),
+    radial-gradient(760px 520px at 96% 6%, rgba(45, 212, 191, 0.08), transparent 60%),
+    var(--color-ink);
+  background-attachment: fixed;
+  color: var(--color-fg);
+  font-family: 'Noto Sans JP', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* iOS で入力時に画面が拡大しないよう 16px を維持する */
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+  font-size: 16px;
+}
+
+/* 数値は等幅で桁を揃える（金融アプリらしい情報設計） */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* 英字ラベル（セクション見出し・ステータス） */
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-fg-mute);
+}
+
+.glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
+  border: 1px solid var(--color-line);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-card);
+}
+
+.hairline {
+  border-color: var(--color-line);
+}
+
+.glow {
+  box-shadow: var(--shadow-glow);
+}
+
+/* 数値のカウント表示に使う細い区切り */
+.divide-hairline > * + * {
+  border-top: 1px solid var(--color-line-soft);
+}
+
+::selection {
+  background: rgba(34, 211, 238, 0.28);
+}
+
+/* スクロールバー（デスクトップ） */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #1c2534;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

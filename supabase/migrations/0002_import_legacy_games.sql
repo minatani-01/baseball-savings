@@ -1,0 +1,116 @@
+-- ============================================================================
+-- Marine Wallet / 0002_import_legacy_games（実施済みの記録）
+-- ----------------------------------------------------------------------------
+-- 旧「千葉ロッテマリーンズ貯金」プロジェクト（ref: uwlnylkkcieqzvrrixjj）の
+-- games 116件を、Marine Wallet の games + saving_entries へ移行した。
+--
+-- 実施日: 2026-09-13
+-- 手順:
+--   1. Free プランの稼働枠を空けるため relay を一時停止
+--   2. 旧プロジェクトを Restore（両プロジェクトとも同一アカウント
+--      minatani.yoshiaki@gmail.com のデータ）
+--   3. 旧 games を読み出し、下記の変換で取り込み
+--   4. 旧プロジェクトを Pause に戻し、relay を Restore
+--
+-- 変換ルール:
+--   date              -> games.game_date
+--   phase             -> そのまま（'japan' があれば 'nippon_series' へ）
+--   opponent          -> そのまま（IDは新旧で共通）
+--   result 'sayonara' -> result='win' + is_sayonara=true
+--   pitcher_bonus     -> 'complete'->complete_game / 'shutout'->shutout /
+--                        'nohit'->no_hitter / 'perfect'->perfect_game /
+--                        'save'-> has_save=true（highlight は none）
+--   amount            -> saving_entries.amount（再計算せず旧アプリの確定額をそのまま保持）
+--   other_bonus_*     -> saving_entries.other_amount / other_note
+--   home_away         -> null（旧アプリは未記録。0004 で null 許容にした）
+--   multi_hits / rbi / is_winning_pitcher -> 0 / 0 / false（旧アプリは未記録）
+--
+--   breakdown は旧アプリのルール（勝利500・サヨナラ+500・引分200・HR200/本・
+--   満塁HR500/本・完投100・セーブ100・その他ボーナス）から再構成した。
+--   旧データのフェーズは regular と interleague のみで倍率が両方 1.0 のため、
+--   内訳の合計は amount と完全に一致する（移行後の検証で不一致 0 件）。
+--
+-- 検証結果:
+--   games 116 / saving_entries 116 / 合計 54,600円 / 2026-03-27〜2026-09-01
+--   内訳合計と amount の不一致: 0 件
+--   既存の割り勘 records 92件は無変更
+--
+-- 再実行が必要になった場合は、旧プロジェクトを Restore して
+-- 下記の SELECT で JSON を取り出し、本ファイル末尾の取り込みクエリに差し込む。
+-- ============================================================================
+
+-- 旧プロジェクト側で実行して JSON を取り出すクエリ
+--
+-- select jsonb_agg(
+--          jsonb_build_array(
+--            to_char(date, 'YYYY-MM-DD'), phase, opponent, result,
+--            coalesce(home_runs, 0), coalesce(grand_slams, 0), pitcher_bonus,
+--            coalesce(amount, 0), coalesce(other_bonus_amount, 0),
+--            coalesce(other_bonus_note, '')
+--          ) order by date, opponent
+--        )::text
+-- from public.games;
+
+-- Marine Wallet 側の取り込みクエリ（:rows に上の JSON、:target_user_id に対象ユーザーIDを入れる）
+--
+-- with src as (
+--   select
+--     (r->>0)::date as game_date,
+--     r->>1 as phase,
+--     r->>2 as opponent,
+--     case when r->>3 in ('win','sayonara') then 'win'
+--          when r->>3 = 'draw' then 'draw' else 'lose' end as result,
+--     (r->>3) = 'sayonara' as is_sayonara,
+--     (r->>4)::int as home_runs,
+--     (r->>5)::int as grand_slams,
+--     case r->>6 when 'complete' then 'complete_game' when 'shutout' then 'shutout'
+--                when 'nohit' then 'no_hitter' when 'perfect' then 'perfect_game'
+--                else 'none' end as pitching_highlight,
+--     (r->>6) = 'save' as has_save,
+--     (r->>7)::int as amount,
+--     (r->>8)::int as other_amount,
+--     r->>9 as other_note
+--   from jsonb_array_elements(:rows::jsonb) as t(r)
+-- ),
+-- scored as (
+--   select s.*,
+--     (case when s.result = 'win' then jsonb_build_array(jsonb_build_object('key','win','label','勝利','amount',500)) else '[]'::jsonb end)
+--     || (case when s.is_sayonara then jsonb_build_array(jsonb_build_object('key','sayonara','label','サヨナラ勝利','amount',500)) else '[]'::jsonb end)
+--     || (case when s.result = 'draw' then jsonb_build_array(jsonb_build_object('key','draw','label','引き分け','amount',200)) else '[]'::jsonb end)
+--     || (case when s.home_runs > 0 then jsonb_build_array(jsonb_build_object('key','home_run','label','ホームラン ' || s.home_runs || '本','amount', s.home_runs * 200)) else '[]'::jsonb end)
+--     || (case when s.grand_slams > 0 then jsonb_build_array(jsonb_build_object('key','grand_slam','label','満塁ホームラン ' || s.grand_slams || '本','amount', s.grand_slams * 500)) else '[]'::jsonb end)
+--     || (case when s.pitching_highlight = 'complete_game' then jsonb_build_array(jsonb_build_object('key','complete_game','label','完投','amount',100)) else '[]'::jsonb end)
+--     || (case when s.has_save then jsonb_build_array(jsonb_build_object('key','save','label','セーブ','amount',100)) else '[]'::jsonb end)
+--     || (case when s.other_amount > 0 then jsonb_build_array(jsonb_build_object('key','other','label','その他ボーナス','amount', s.other_amount)) else '[]'::jsonb end)
+--     as breakdown
+--   from src s
+-- ),
+-- ins_games as (
+--   insert into public.games (game_date, opponent, phase, home_away, stadium, result, is_sayonara,
+--                             home_runs, grand_slams, multi_hits, rbi, pitching_highlight,
+--                             is_winning_pitcher, has_save, source, created_by)
+--   select game_date, opponent, phase, null, '', result, is_sayonara,
+--          home_runs, grand_slams, 0, 0, pitching_highlight,
+--          false, has_save, 'manual', :target_user_id::uuid
+--   from scored
+--   on conflict (game_date, opponent) do update
+--     set phase = excluded.phase, result = excluded.result, is_sayonara = excluded.is_sayonara,
+--         home_runs = excluded.home_runs, grand_slams = excluded.grand_slams,
+--         pitching_highlight = excluded.pitching_highlight, has_save = excluded.has_save
+--   returning id, game_date, opponent
+-- )
+-- insert into public.saving_entries (user_id, game_id, kind, title, entry_date, amount, breakdown, other_amount, other_note)
+-- select :target_user_id::uuid, g.id, 'game', '', s.game_date, s.amount, s.breakdown, s.other_amount, s.other_note
+-- from scored s
+-- join ins_games g on g.game_date = s.game_date and g.opponent = s.opponent
+-- on conflict (user_id, game_id) do update
+--   set amount = excluded.amount, breakdown = excluded.breakdown,
+--       other_amount = excluded.other_amount, other_note = excluded.other_note,
+--       entry_date = excluded.entry_date;
+
+-- 検証クエリ
+--
+-- select count(*) as entries, sum(amount) as total,
+--        count(*) filter (where (select coalesce(sum((b->>'amount')::int),0)
+--                                from jsonb_array_elements(breakdown) b) <> amount) as breakdown_mismatch
+-- from public.saving_entries;
