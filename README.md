@@ -58,7 +58,8 @@ Vercel のプロジェクト設定で以下を差し替えてください。
 | `VITE_SUPABASE_URL` | `NEXT_PUBLIC_SUPABASE_URL` |
 | `VITE_SUPABASE_KEY` | `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
 
-また、Supabase プロジェクトも統合先（割り勘側）に切り替えます。Framework Preset は Next.js が自動検出されます。
+また、Supabase プロジェクトも統合先の **Marine Wallet**（ref `xliszlnpypvqghrwplxa` /
+旧「割り勘メモ」）へ切り替えます。Framework Preset は Next.js が自動検出されます。
 
 ## 画面構成
 

@@ -2,7 +2,7 @@
 -- Marine Wallet / 0001_marine_wallet_core
 -- ----------------------------------------------------------------------------
 -- 適用先: Marine Wallet の共通 Supabase プロジェクト
---         （既存の割り勘アプリのプロジェクト = ref: xliszlnpypvqghrwplxa を流用する想定）
+--         （Marine Wallet / ref: xliszlnpypvqghrwplxa。旧「割り勘メモ」プロジェクトを流用）
 --
 -- 方針:
 --   - 既存の records / settings はテーブル名も含めてそのまま活かし、列を追加するだけにする。

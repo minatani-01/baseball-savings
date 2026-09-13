@@ -14,7 +14,7 @@
 | リポジトリ | `minatani-01/baseball-savings` | `minatani-01/warikan-app` |
 | 公開URL | baseball-savings.vercel.app | warikan-app-puce.vercel.app |
 | スタック | Vite + React 18 + Supabase | Next.js 16 + React 19 + Tailwind v4 + Supabase |
-| Supabase | 「千葉ロッテマリーンズ貯金」（PAUSED） | 「割り勘メモ」→ Marine Wallet へ改称（ACTIVE） |
+| Supabase | 「千葉ロッテマリーンズ貯金」（移行後 PAUSED） | 「割り勘メモ」→ **Marine Wallet** へ改称（ACTIVE） |
 | 主テーブル | `games`（ユーザーごと） | `records` / `settings` |
 
 ### 1.2 決めたこと
@@ -23,7 +23,7 @@
 | --- | --- | --- |
 | ベースにするコード | 割り勘側のスタック（Next.js 16 / Tailwind v4 / Supabase SSR） | 仕様書39章の推奨構成と一致し、SSR認証・App Router が既に動作していたため。貯金側は画面数が少なく移植コストが低い |
 | リポジトリ | `baseball-savings` を Marine Wallet 本体へ転換 | 既存の公開URLと履歴を活かせる。Vite構成（`src/`, `index.html`, `vite.config.js`）は削除した |
-| Supabase | 「割り勘メモ」プロジェクトを共通DBへ拡張 | 稼働中のプロジェクトを土台にでき、既存の割り勘データ（92件）を移行せずに済む。貯金側は PAUSED で復旧が必要なため移行元とする |
+| Supabase | 旧「割り勘メモ」プロジェクト（現 Marine Wallet / `xliszlnpypvqghrwplxa`）を共通DBへ拡張 | 稼働中のプロジェクトを土台にでき、既存の割り勘データ（92件）を移行せずに済む。貯金側は PAUSED で復旧が必要なため移行元とする |
 | 認証 | Supabase Auth（メール/パスワード）に一本化 | 仕様書34章の推奨どおり |
 | データ書き込み | クライアントから RLS 経由で直接実行 | 個人利用規模でAPIルートを二重に持つ必要がないため。整合性は DB の CHECK 制約と RLS で担保する |
 | チャート | 外部ライブラリを使わず SVG 自前描画 | recharts は React 19 との組み合わせで追加検証が必要になる。トンマナ（線幅・発光）も直接制御したい |
@@ -182,9 +182,9 @@ Marine Wallet から送金は行わない。金額をクリップボードへコ
 
 1. ~~Supabase 共通プロジェクト（`xliszlnpypvqghrwplxa`）で `0001_marine_wallet_core.sql` / `0003_confirmed_ui.sql` を実行する~~
    **適用済み**。既存の `records`（92件）と `settings` は変更していない。
-   **プロジェクト名の「割り勘メモ」→「Marine Wallet」への変更はダッシュボード操作のみ**（Management API に改称の口が無いため）。
-   Supabase ダッシュボード → Project Settings → General → Project name。ref とキーは変わらないので、
-   改称してもアプリの環境変数を直す必要はない。
+   プロジェクト名は「割り勘メモ」から **Marine Wallet** へ改称済み（2026-09-13）。
+   改称は Management API に口が無くダッシュボード操作のみ。ref とキーは変わらないため、
+   アプリの環境変数への影響はない。
 2. Vercel の環境変数を `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` に差し替える
 3. ~~旧ロッテ貯金プロジェクト（`uwlnylkkcieqzvrrixjj`）から `games` を移行する~~ **完了（2026-09-13）**
    - Free プランの稼働枠が埋まっていたため `relay` を一時停止 → 旧プロジェクトを Restore →
@@ -243,8 +243,20 @@ Marine Wallet から送金は行わない。金額をクリップボードへコ
 | 割り勘の計算ロジック | `lib/warikan.ts` として原本と同一のまま移設済み |
 | `records` / `settings` テーブル | `records` は継続利用（92件保持）。`settings` はメンバー移行元として読み取り済みで、アプリからは参照しなくなった（削除はしていない） |
 | メンバー管理 | `settings.member_a/b/c` の2〜3人固定から `split_members` の人数無制限へ置き換え |
-| Supabase プロジェクト名 | 「割り勘メモ」のまま。改称はダッシュボード操作が必要 |
+| Supabase プロジェクト名 | **Marine Wallet** へ改称済み（ref `xliszlnpypvqghrwplxa` とAPIキーは不変） |
 | 旧デプロイ（warikan-app-puce.vercel.app） | 本アプリが上位互換。停止・削除は利用者側の判断 |
 
 `settings` テーブルは移行元として残してあるだけで、アプリのコードからは参照していない。
 移行結果に問題がないことを確認できたら削除してよい。
+
+### Project ID / リージョンについて
+
+どちらも変更不可のため、現状のまま運用する。
+
+- **Project ID（ref）** はシステムが自動採番する不変の識別子。新規プロジェクトを作っても
+  ID は選べないため、「好きなIDにする」という選択肢自体が存在しない。
+- **リージョン** はインフラ層で固定されており、変更するには新プロジェクトを作って移行するしかない
+  （[Change Project Region](https://supabase.com/docs/guides/troubleshooting/change-project-region-eWJo5Z)）。
+  現在の `ap-northeast-1`（東京）は日本から使う本アプリにとって最適なので、変更する理由がない。
+- API URL の見た目を変えたい場合は Vanity subdomain または Custom domain（いずれも有料プランの
+  追加アドオン）で対応できるが、本アプリでは不要と判断した。
