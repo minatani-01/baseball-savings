@@ -28,7 +28,8 @@ export type Game = {
   game_date: string
   opponent: string
   phase: Phase
-  home_away: HomeAway
+  /** 旧アプリから移行した試合は不明（null） */
+  home_away: HomeAway | null
   stadium: string
   result: GameResult
   is_sayonara: boolean

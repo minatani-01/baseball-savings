@@ -186,12 +186,34 @@ Marine Wallet から送金は行わない。金額をクリップボードへコ
    Supabase ダッシュボード → Project Settings → General → Project name。ref とキーは変わらないので、
    改称してもアプリの環境変数を直す必要はない。
 2. Vercel の環境変数を `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` に差し替える
-3. 旧ロッテ貯金プロジェクト（`uwlnylkkcieqzvrrixjj` / PAUSED）を Restore し、`games` を CSV エクスポートする
-   - **注意**: 組織は Free プランで、現在 `割り勘メモ`（= Marine Wallet 共通DB）と `relay` の2プロジェクトが稼働中。
-     Free プランの稼働プロジェクト数上限に達しているため、Restore の前に `relay` を一時停止するか、
-     プランを上げる必要がある。CSV を取得したら旧プロジェクトは再び Pause してよい
-4. `0002_import_legacy_games.sql` の手順に従って取り込む
-5. 取り込み結果を確認したら、旧プロジェクトを削除または PAUSED に戻す
+3. ~~旧ロッテ貯金プロジェクト（`uwlnylkkcieqzvrrixjj`）から `games` を移行する~~ **完了（2026-09-13）**
+   - Free プランの稼働枠が埋まっていたため `relay` を一時停止 → 旧プロジェクトを Restore →
+     移行 → 旧プロジェクトを Pause → `relay` を Restore、の順で実施した
+   - 詳細と再実行用のクエリは `0002_import_legacy_games.sql` に記録
+
+### 移行結果
+
+| 項目 | 値 |
+| --- | --- |
+| games / saving_entries | 116件 / 116件 |
+| 合計金額 | ¥54,600（旧アプリの合計と一致） |
+| 期間 | 2026-03-27 〜 2026-09-01 |
+| メモ付きの試合 | 13件（すべて保持） |
+| 内訳合計と金額の不一致 | 0件 |
+| 既存の割り勘 `records` | 92件（無変更） |
+
+旧アプリが記録していなかった項目の扱い:
+
+| 項目 | 移行後 |
+| --- | --- |
+| ホーム / ビジター | `null`（不明）。UIではバッジを出さない（`0004_home_away_nullable.sql`） |
+| 球場・スコア | 空 / `null` |
+| マルチ安打・打点・勝利投手 | 0 / 0 / false（金額に影響しない） |
+
+金額は再計算せず旧アプリの確定額をそのまま保持している。内訳（breakdown）は旧ルール
+（勝利500・サヨナラ+500・引分200・HR200/本・満塁HR500/本・完投100・セーブ100・その他）
+から再構成した。旧データのフェーズは regular と interleague のみで倍率が両方 1.0 のため、
+再構成した内訳の合計は全116件で amount と一致する。
 
 ### 適用時に判明した制約
 

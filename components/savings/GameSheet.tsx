@@ -82,7 +82,7 @@ function toForm(entry: SavingEntryRow | null): FormState {
     game_date: g.game_date,
     opponent: g.opponent,
     phase: g.phase,
-    home_away: g.home_away,
+    home_away: g.home_away ?? 'home',
     stadium: g.stadium ?? '',
     result: g.result,
     is_sayonara: g.is_sayonara,

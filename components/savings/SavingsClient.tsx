@@ -362,7 +362,11 @@ export default function SavingsClient({
                       <div className="flex items-center gap-2 text-[11px] text-fg-mute">
                         <span className="tnum">{shortDate(entry.entry_date)}</span>
                         {g && g.phase !== 'regular' ? <span>{phaseLabel(g.phase)}</span> : null}
-                        {g ? <span>{g.home_away === 'home' ? 'H' : 'A'}</span> : <span>カスタム</span>}
+                        {g ? (
+                          g.home_away ? <span>{g.home_away === 'home' ? 'H' : 'A'}</span> : null
+                        ) : (
+                          <span>カスタム</span>
+                        )}
                       </div>
                       <div className="mt-1 truncate text-sm">
                         {g ? (
