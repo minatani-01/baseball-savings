@@ -373,3 +373,22 @@ export function IconDots(props: IconProps) {
     </Icon>
   )
 }
+
+export function IconAlert(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8.4" />
+      <path d="M12 7.8v4.8" />
+      <path d="M12 16.2h.01" />
+    </Icon>
+  )
+}
+
+export function IconRefresh(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+      <path d="M20 4.4V9h-4.6" />
+    </Icon>
+  )
+}

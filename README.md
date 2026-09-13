@@ -84,6 +84,10 @@ Vercel のプロジェクト設定で以下を差し替えてください。
 - **ワンバンク入金は月末に1回**。`monthly_savings` が
   `calculating → ready → deposit_pending → deposited` の状態を管理します。
 - **UIに絵文字は使わない**（仕様書 4.1）。アイコンはすべて `components/icons.tsx` の SVG ラインアイコンです。
+- **読み取りに失敗したら金額を表示しない**。`lib/queries.ts` は取得エラーを握りつぶさず
+  `QueryError` を投げ、`app/(app)/error.tsx` が再読み込みを促します。
+  Supabase の Free プランはアイドル後の初回アクセスで 504 を返すことがあるため、
+  読み取りは1回だけ自動で再試行します（読み取りは冪等なので安全）。
 
 ## スクリプト
 
