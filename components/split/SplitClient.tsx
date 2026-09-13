@@ -53,7 +53,7 @@ export default function SplitClient({
   const unpaid = useMemo(() => records.filter((r) => r.status === 'unpaid'), [records])
   const paid = useMemo(() => records.filter((r) => r.status === 'paid'), [records])
 
-  const { paidTotals, transfers, unpaidTotal, settledTotal, grandTotal } = useMemo(() => {
+  const { paidTotals, transfers, unpaidTotal, settlementTotal, balancedTotal } = useMemo(() => {
     const paidMap = new Map<string, number>(memberNames.map((m) => [m, 0]))
     const burdenMap = new Map<string, number>(memberNames.map((m) => [m, 0]))
 
@@ -70,14 +70,20 @@ export default function SplitClient({
       balance: (paidMap.get(member) ?? 0) - (burdenMap.get(member) ?? 0),
     }))
 
+    const transfers = simplifyDebts(balances)
+    // 未精算レコードの総額と、そのうち実際に動かす必要がある金額（＝精算額）を分けて持つ
+    const unpaidTotal = unpaid.reduce((sum, r) => sum + r.amount, 0)
+    const settlementTotal = transfers.reduce((sum, t) => sum + t.amount, 0)
+
     return {
       paidTotals: paidMap,
-      transfers: simplifyDebts(balances),
-      unpaidTotal: unpaid.reduce((sum, r) => sum + r.amount, 0),
-      settledTotal: paid.reduce((sum, r) => sum + r.amount, 0),
-      grandTotal: records.reduce((sum, r) => sum + r.amount, 0),
+      transfers,
+      unpaidTotal,
+      settlementTotal,
+      // 立替が釣り合っていて送金不要な分
+      balancedTotal: Math.max(0, unpaidTotal - settlementTotal),
     }
-  }, [unpaid, paid, records, memberNames])
+  }, [unpaid, memberNames])
 
   const visible = useMemo(() => {
     const base = filter === 'unpaid' ? unpaid : filter === 'paid' ? paid : records
@@ -134,7 +140,7 @@ export default function SplitClient({
           <div className="min-w-0 flex-1">
             <div className="eyebrow">未精算の合計</div>
             <div className="mt-1.5">
-              <Amount value={unpaidTotal} size="xl" tone="marine" />
+              <Amount value={settlementTotal} size="xl" tone="marine" />
             </div>
             <p className="mt-1 text-xs text-fg-mute">{unpaid.length}件の割り勘が未精算です</p>
           </div>
@@ -142,10 +148,10 @@ export default function SplitClient({
 
         <div className="mt-4 border-t border-line pt-4">
           <ProgressBar
-            value={settledTotal}
-            max={grandTotal}
+            value={balancedTotal}
+            max={unpaidTotal}
             label="支払い状況"
-            caption={`${yen(settledTotal)} / ${yen(grandTotal)}`}
+            caption={`残り ${yen(settlementTotal)} / ${yen(unpaidTotal)}`}
           />
         </div>
       </Card>
