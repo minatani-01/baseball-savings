@@ -154,12 +154,21 @@ Marine Wallet から送金は行わない。金額をクリップボードへコ
 
 ## 4. 移行手順
 
-1. Supabase「割り勘メモ」プロジェクトで `0001_marine_wallet_core.sql` を実行する
-   （プロジェクト名は Marine Wallet に変更してよい）
+1. ~~Supabase「割り勘メモ」プロジェクト（`xliszlnpypvqghrwplxa`）で `0001_marine_wallet_core.sql` を実行する~~
+   **適用済み**。既存の `records`（92件）と `settings` は変更していない。
+   プロジェクト名は Marine Wallet に変更してよい。
 2. Vercel の環境変数を `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` に差し替える
-3. 旧ロッテ貯金プロジェクト（PAUSED）を Restore し、`games` を CSV エクスポートする
+3. 旧ロッテ貯金プロジェクト（`uwlnylkkcieqzvrrixjj` / PAUSED）を Restore し、`games` を CSV エクスポートする
+   - Restore すると稼働プロジェクトが3つになるため、Supabase の無料枠を超えないか確認すること
 4. `0002_import_legacy_games.sql` の手順に従って取り込む
-5. 取り込み結果を確認したら、旧プロジェクトを削除または PAUSED のままにする
+5. 取り込み結果を確認したら、旧プロジェクトを削除または PAUSED に戻す
+
+### 適用時に判明した制約
+
+- `saving_entries.month` は当初 `to_char(entry_date, 'YYYY-MM')` の生成列にしていたが、
+  `to_char` は immutable ではないため生成列に使えない。`extract` + `lpad` で組み立てる形に変更した。
+- Supabase の security linter（0011）に合わせ、`touch_updated_at` と `generate_marine_id` は
+  `search_path = ''` を固定している。既存の `update_updated_at`（割り勘アプリ由来）は未対応のまま残っている。
 
 ---
 

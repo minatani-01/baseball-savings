@@ -21,6 +21,8 @@ create extension if not exists pgcrypto;
 create or replace function public.touch_updated_at()
 returns trigger
 language plpgsql
+-- search_path を固定して関数の乗っ取りを防ぐ（Supabase security linter 0011 対応）
+set search_path = ''
 as $$
 begin
   new.updated_at := now();
@@ -35,6 +37,7 @@ create or replace function public.generate_marine_id()
 returns text
 language plpgsql
 volatile
+set search_path = ''
 as $$
 declare
   alphabet constant text := '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -218,7 +221,10 @@ create table if not exists public.saving_entries (
   user_id uuid not null references auth.users (id) on delete cascade,
   game_id uuid not null references public.games (id) on delete cascade,
   entry_date date not null,
-  month text generated always as (to_char(entry_date, 'YYYY-MM')) stored,
+  -- to_char は immutable ではないため生成列に使えない。extract 系で 'YYYY-MM' を組み立てる
+  month text generated always as (
+    extract(year from entry_date)::text || '-' || lpad(extract(month from entry_date)::text, 2, '0')
+  ) stored,
   amount int not null check (amount >= 0),
   -- 内訳: [{ "key": "win", "label": "勝利", "amount": 500 }, ...]
   breakdown jsonb not null default '[]'::jsonb,
