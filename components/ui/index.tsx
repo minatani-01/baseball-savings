@@ -1,0 +1,291 @@
+'use client'
+
+import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import { IconClose } from '@/components/icons'
+import { yen } from '@/lib/format'
+
+// ---------------------------------------------------------------- Card ----
+export function Card({
+  children,
+  className = '',
+  padded = true,
+}: {
+  children: ReactNode
+  className?: string
+  padded?: boolean
+}) {
+  return (
+    <div className={`glass rounded-2xl ${padded ? 'p-4' : ''} ${className}`}>{children}</div>
+  )
+}
+
+export function SectionLabel({ children, action }: { children: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="mb-2.5 flex items-end justify-between gap-3">
+      <span className="eyebrow">{children}</span>
+      {action}
+    </div>
+  )
+}
+
+// ------------------------------------------------------------- Amounts ----
+export function Amount({
+  value,
+  size = 'md',
+  tone = 'default',
+}: {
+  value: number
+  size?: 'sm' | 'md' | 'lg' | 'xl'
+  tone?: 'default' | 'marine' | 'dim' | 'danger'
+}) {
+  const sizes = {
+    sm: 'text-base',
+    md: 'text-2xl',
+    lg: 'text-[32px] leading-none',
+    xl: 'text-[42px] leading-none',
+  }
+  const tones = {
+    default: 'text-fg',
+    marine: 'text-marine',
+    dim: 'text-fg-dim',
+    danger: 'text-danger',
+  }
+  return (
+    <span className={`tnum font-semibold ${sizes[size]} ${tones[tone]}`}>{yen(value)}</span>
+  )
+}
+
+export function StatTile({
+  label,
+  value,
+  sub,
+  tone = 'default',
+}: {
+  label: string
+  value: ReactNode
+  sub?: ReactNode
+  tone?: 'default' | 'marine' | 'dim' | 'danger'
+}) {
+  return (
+    <Card className="min-w-0">
+      <div className="eyebrow truncate">{label}</div>
+      <div className="mt-2">
+        {typeof value === 'number' ? <Amount value={value} tone={tone} /> : value}
+      </div>
+      {sub ? <div className="mt-1 text-xs text-fg-mute">{sub}</div> : null}
+    </Card>
+  )
+}
+
+// ------------------------------------------------------------- Buttons ----
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: 'primary' | 'ghost' | 'outline' | 'danger'
+  full?: boolean
+}
+
+export function Button({
+  variant = 'outline',
+  full = false,
+  className = '',
+  children,
+  ...props
+}: ButtonProps) {
+  const base =
+    'inline-flex items-center justify-center gap-2 rounded-xl px-4 min-h-[46px] text-sm font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none'
+  const variants = {
+    primary:
+      'bg-marine text-ink hover:bg-teal font-semibold shadow-[0_0_40px_-18px_rgba(34,211,238,0.9)]',
+    outline: 'border border-line text-fg hover:border-marine/60 hover:text-marine bg-white/[0.02]',
+    ghost: 'text-fg-dim hover:text-fg',
+    danger: 'border border-danger/40 text-danger hover:bg-danger/10',
+  }
+  return (
+    <button
+      className={`${base} ${variants[variant]} ${full ? 'w-full' : ''} ${className}`}
+      {...props}
+    >
+      {children}
+    </button>
+  )
+}
+
+export function IconButton({
+  label,
+  className = '',
+  children,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
+  return (
+    <button
+      aria-label={label}
+      title={label}
+      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border border-line text-fg-mute transition-colors hover:border-marine/50 hover:text-marine ${className}`}
+      {...props}
+    >
+      {children}
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------- Chip ----
+export function Chip({
+  selected,
+  onClick,
+  children,
+  sub,
+  className = '',
+}: {
+  selected: boolean
+  onClick: () => void
+  children: ReactNode
+  sub?: ReactNode
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`min-h-[44px] rounded-xl border px-3 py-2 text-sm transition-colors ${
+        selected
+          ? 'border-marine/70 bg-marine/10 text-marine font-medium'
+          : 'border-line bg-white/[0.02] text-fg-dim hover:border-line hover:text-fg'
+      } ${className}`}
+    >
+      <span className="block leading-tight">{children}</span>
+      {sub ? <span className="mt-0.5 block text-[10px] leading-tight opacity-70">{sub}</span> : null}
+    </button>
+  )
+}
+
+export function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T
+  options: { id: T; label: string }[]
+  onChange: (id: T) => void
+}) {
+  return (
+    <div className="flex rounded-xl border border-line bg-white/[0.02] p-1">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => onChange(o.id)}
+          aria-pressed={value === o.id}
+          className={`min-h-[38px] flex-1 rounded-lg px-2 text-[13px] transition-colors ${
+            value === o.id ? 'bg-marine/15 text-marine font-medium' : 'text-fg-mute hover:text-fg'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// --------------------------------------------------------------- Field ----
+export function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string
+  hint?: string
+  children: ReactNode
+}) {
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline gap-2">
+        <span className="text-[13px] font-medium text-fg-dim">{label}</span>
+        {hint ? <span className="text-[11px] text-fg-mute">{hint}</span> : null}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+export const inputClass =
+  'w-full rounded-xl border border-line bg-ink-2/80 px-3.5 py-2.5 text-fg outline-none transition-colors placeholder:text-fg-mute focus:border-marine/70'
+
+// -------------------------------------------------------------- Status ----
+export function StatusPill({
+  children,
+  tone = 'neutral',
+}: {
+  children: ReactNode
+  tone?: 'neutral' | 'marine' | 'warn' | 'done'
+}) {
+  const tones = {
+    neutral: 'border-line text-fg-mute',
+    marine: 'border-marine/50 text-marine',
+    warn: 'border-warn/50 text-warn',
+    done: 'border-teal/50 text-teal',
+  }
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] tracking-[0.14em] uppercase ${tones[tone]}`}
+    >
+      {children}
+    </span>
+  )
+}
+
+// --------------------------------------------------------------- Sheet ----
+export function Sheet({
+  title,
+  onClose,
+  children,
+  footer,
+}: {
+  title: string
+  onClose: () => void
+  children: ReactNode
+  footer?: ReactNode
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center">
+      <div className="flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-3xl border border-line bg-ink-2 sm:rounded-3xl">
+        <div className="flex items-center justify-between border-b border-line px-4 py-3">
+          <h2 className="text-sm font-semibold tracking-wide">{title}</h2>
+          <IconButton label="閉じる" onClick={onClose}>
+            <IconClose size={18} />
+          </IconButton>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4">{children}</div>
+        {footer ? <div className="border-t border-line px-4 py-3">{footer}</div> : null}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------- Misc ----
+export function EmptyState({ title, description }: { title: string; description?: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-line px-6 py-12 text-center">
+      <p className="text-sm text-fg-dim">{title}</p>
+      {description ? <p className="mt-1.5 text-xs text-fg-mute">{description}</p> : null}
+    </div>
+  )
+}
+
+export function Row({
+  label,
+  value,
+  strong = false,
+}: {
+  label: ReactNode
+  value: ReactNode
+  strong?: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2">
+      <span className={`text-[13px] ${strong ? 'text-fg' : 'text-fg-mute'}`}>{label}</span>
+      <span className={`tnum text-sm ${strong ? 'font-semibold text-fg' : 'text-fg-dim'}`}>
+        {value}
+      </span>
+    </div>
+  )
+}
