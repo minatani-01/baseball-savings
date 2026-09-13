@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { DEFAULT_SAVING_RULES } from '@/lib/savings'
 import type {
   Game,
-  MemberSettings,
   MonthlySaving,
   Profile,
   SavingEntryRow,
@@ -78,19 +77,6 @@ export async function getSplitRecords(userId: string): Promise<SplitRecord[]> {
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
   return (data ?? []) as SplitRecord[]
-}
-
-export async function getMemberSettings(userId: string): Promise<MemberSettings> {
-  const supabase = await createClient()
-  const { data } = await supabase.from('settings').select('*').eq('user_id', userId).maybeSingle()
-  return (
-    (data as MemberSettings | null) ?? {
-      user_id: userId,
-      member_a: 'Aさん',
-      member_b: 'Bさん',
-      member_c: null,
-    }
-  )
 }
 
 export async function getSplitMembers(userId: string): Promise<SplitMember[]> {

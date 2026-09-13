@@ -14,7 +14,7 @@
 | リポジトリ | `minatani-01/baseball-savings` | `minatani-01/warikan-app` |
 | 公開URL | baseball-savings.vercel.app | warikan-app-puce.vercel.app |
 | スタック | Vite + React 18 + Supabase | Next.js 16 + React 19 + Tailwind v4 + Supabase |
-| Supabase | 「千葉ロッテマリーンズ貯金」（PAUSED） | 「割り勘メモ」（ACTIVE） |
+| Supabase | 「千葉ロッテマリーンズ貯金」（PAUSED） | 「割り勘メモ」→ Marine Wallet へ改称（ACTIVE） |
 | 主テーブル | `games`（ユーザーごと） | `records` / `settings` |
 
 ### 1.2 決めたこと
@@ -178,12 +178,14 @@ Marine Wallet から送金は行わない。金額をクリップボードへコ
 
 ## 4. 移行手順
 
-1. ~~Supabase「割り勘メモ」プロジェクト（`xliszlnpypvqghrwplxa`）で `0001_marine_wallet_core.sql` を実行する~~
+1. ~~Supabase 共通プロジェクト（`xliszlnpypvqghrwplxa`）で `0001_marine_wallet_core.sql` / `0003_confirmed_ui.sql` を実行する~~
    **適用済み**。既存の `records`（92件）と `settings` は変更していない。
-   プロジェクト名は Marine Wallet に変更してよい。
+   **プロジェクト名の「割り勘メモ」→「Marine Wallet」への変更はダッシュボード操作のみ**（Management API に改称の口が無いため）。
+   Supabase ダッシュボード → Project Settings → General → Project name。ref とキーは変わらないので、
+   改称してもアプリの環境変数を直す必要はない。
 2. Vercel の環境変数を `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` に差し替える
 3. 旧ロッテ貯金プロジェクト（`uwlnylkkcieqzvrrixjj` / PAUSED）を Restore し、`games` を CSV エクスポートする
-   - **注意**: 組織は Free プランで、現在 `割り勘メモ` と `relay` の2プロジェクトが稼働中。
+   - **注意**: 組織は Free プランで、現在 `割り勘メモ`（= Marine Wallet 共通DB）と `relay` の2プロジェクトが稼働中。
      Free プランの稼働プロジェクト数上限に達しているため、Restore の前に `relay` を一時停止するか、
      プランを上げる必要がある。CSV を取得したら旧プロジェクトは再び Pause してよい
 4. `0002_import_legacy_games.sql` の手順に従って取り込む
@@ -207,3 +209,18 @@ Marine Wallet から送金は行わない。金額をクリップボードへコ
   利用規約を確認する必要がある。
 - **観戦（現地）フラグ**: 仕様書21章の Attendance Log は Phase 5。現状ホームの
   「今月の試合」は記録した試合数であり、現地観戦数ではない。
+
+---
+
+## 6. 旧「割り勘メモ」からの置き換え状況
+
+| 対象 | 状況 |
+| --- | --- |
+| 割り勘の計算ロジック | `lib/warikan.ts` として原本と同一のまま移設済み |
+| `records` / `settings` テーブル | `records` は継続利用（92件保持）。`settings` はメンバー移行元として読み取り済みで、アプリからは参照しなくなった（削除はしていない） |
+| メンバー管理 | `settings.member_a/b/c` の2〜3人固定から `split_members` の人数無制限へ置き換え |
+| Supabase プロジェクト名 | 「割り勘メモ」のまま。改称はダッシュボード操作が必要 |
+| 旧デプロイ（warikan-app-puce.vercel.app） | 本アプリが上位互換。停止・削除は利用者側の判断 |
+
+`settings` テーブルは移行元として残してあるだけで、アプリのコードからは参照していない。
+移行結果に問題がないことを確認できたら削除してよい。

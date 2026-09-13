@@ -59,7 +59,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             ) : null}
           </div>
 
-          <div className="flex min-w-0 justify-center">
+          <div className="flex min-w-0 justify-center overflow-hidden">
             {header ? (
               <span className="truncate text-[15px] font-semibold tracking-wide">
                 {header.title}

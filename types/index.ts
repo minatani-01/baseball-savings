@@ -161,13 +161,3 @@ export type SplitRecord = {
   created_at: string
   updated_at: string
 }
-
-/** 旧2人固定時代の設定。split_members へ移行済みだが読み取り互換のため残す */
-export type MemberSettings = {
-  id?: string
-  user_id?: string
-  member_a: string
-  member_b: string
-  member_c: string | null
-  updated_at?: string
-}

@@ -55,7 +55,7 @@ export default function LoginPage() {
     <div className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-6 py-12">
       <div className="mb-10 flex flex-col items-center text-center">
         <p className="eyebrow">{TEAM_NAME}</p>
-        <div className="mt-4">
+        <div className="mt-5">
           <Brand size="lg" withTagline />
         </div>
         <p className="mt-6 text-[15px] leading-relaxed font-medium">

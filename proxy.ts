@@ -46,5 +46,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // 画像などの静的アセットは認証チェックの対象外にする。
+  // 除外しないと未ログイン時に /icon.png や /brand/mark.png まで /login へリダイレクトされ、
+  // ログイン画面のロゴが表示されなくなる。
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|avif)$).*)',
+  ],
 }
