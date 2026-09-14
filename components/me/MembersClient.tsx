@@ -83,6 +83,10 @@ export default function MembersClient({
   const [savedId, setSavedId] = useState<string | null>(null)
   const [uploading, setUploading] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  // シートの対象はメンバー。接続していない人にも開けるようにする。
+  // 実体ではなく id で持ち、表示は members から引き直す。
+  // 実体を握ると、トグルを切ったあとも古い値が残って見える。
+  const [settingsMemberId, setSettingsMemberId] = useState<string | null>(null)
   const [permissionTarget, setPermissionTarget] = useState<MarineLinkView | null>(null)
 
   const connected = useMemo(() => links.filter((l) => l.status === 'accepted'), [links])
@@ -95,10 +99,6 @@ export default function MembersClient({
   const linkOf = (member: SplitMemberView) =>
     links.find((l) => sameId(l.partner_marine_id, member.marine_id)) ?? null
 
-  /** linkOf の逆引き。共有設定シートから、その人のメンバー行を引く */
-  const memberOf = (link: MarineLinkView) =>
-    members.find((m) => sameId(m.marine_id, link.partner_marine_id)) ?? null
-
   /** どのメンバーにも紐づいていない接続。メンバーへ取り込めるように別枠で出す */
   const unlistedLinks = useMemo(
     () =>
@@ -107,6 +107,21 @@ export default function MembersClient({
       ),
     [connected, members]
   )
+
+  const settingsMember = members.find((m) => m.id === settingsMemberId) ?? null
+
+  const openSettings = (member: SplitMemberView) => {
+    setSettingsMemberId(member.id)
+    setPermissionTarget(linkOf(member))
+  }
+
+  /** 共有の設定は、接続が承認されているときだけ意味を持つ */
+  const connectedTarget = permissionTarget?.status === 'accepted' ? permissionTarget : null
+
+  const closeSettings = () => {
+    setSettingsMemberId(null)
+    setPermissionTarget(null)
+  }
 
   const draftOf = (member: SplitMemberView) => draftIds[member.id] ?? member.marine_id ?? ''
 
@@ -217,7 +232,7 @@ export default function MembersClient({
       setError(error.message)
       return
     }
-    setPermissionTarget(null)
+    closeSettings()
     router.refresh()
   }
 
@@ -518,15 +533,16 @@ export default function MembersClient({
                           >
                             接続
                           </Button>
-                        ) : link?.status === 'accepted' ? (
+                        ) : (
+                          // 接続していない人にも開く。割り勘に出すかどうかはここで決める
                           <Button
-                            onClick={() => setPermissionTarget(link)}
+                            onClick={() => openSettings(member)}
                             disabled={busy}
                             className="shrink-0 !min-h-[36px] !px-3 text-[12px]"
                           >
-                            共有設定
+                            {link?.status === 'accepted' ? '共有設定' : '設定'}
                           </Button>
-                        ) : null}
+                        )}
                       </div>
 
                       {member.avatar_path ? (
@@ -655,102 +671,119 @@ export default function MembersClient({
             {isMaster ? 'マスター権限のため、あなたが送ったリクエストは承認を待たずに接続されます。' : ''}
           </p>
           <p className="mt-2.5 text-[13px] leading-relaxed text-fg-mute">
-            メンバーに載っている人が、割り勘の登場人物です。割り勘から外したいときは
-            メンバーごと削除してください。相手から見えるのは、その人が参加している記録だけです
+            行の「設定」で、その人を割り勘に出すかどうかを選べます。接続している相手なら、
+            何を相手に見せるかと、相手の貯金を自分の総累計に合算するかもここで選べます。
+            相手から見えるのは、その人が参加している記録だけです
             （参加していない記録は見えません。相手が書き換えることもできません）。
-            何を相手に見せるか、相手の貯金を自分の総累計に合算するかは、
-            行の「共有設定」でまとめて選べます。
           </p>
         </Card>
       </div>
 
-      {/* 共有設定。link から、対応するメンバー行を引き当てて合算の設定も出す */}
-      {permissionTarget ? (
+      {/* 設定。接続していない人にも開く。共有の4項目は接続があるときだけ出す */}
+      {settingsMember ? (
         <Sheet
-          title={`${partnerLabel(permissionTarget)} との共有設定`}
-          onClose={() => setPermissionTarget(null)}
+          title={
+            connectedTarget
+              ? `${partnerLabel(connectedTarget)} との共有設定`
+              : `${settingsMember.name} の設定`
+          }
+          onClose={closeSettings}
         >
-          <p className="mb-4 text-[11px] leading-relaxed text-fg-mute">
-            あなたのデータのうち、相手に見せるものを選びます。相手からは閲覧のみで、
-            書き換えはできません。試合結果は全ユーザー共通のデータなので、常に共有されます。
-          </p>
-
-          <div className="divide-hairline">
-            {LINK_RESOURCE_META.map((resource) => (
-              <Toggle
-                key={resource.id}
-                checked={permissionTarget.shared[resource.id]}
-                onChange={(next) => setPermission(permissionTarget, resource.id, next)}
-                label={resource.label}
-                hint={resource.hint}
-              />
-            ))}
-          </div>
-
-          {memberOf(permissionTarget) ? (
-            <div className="mt-5 border-t border-line pt-4">
-              <p className="eyebrow mb-1">あなたの集計に入れるもの</p>
-              <p className="mb-1 text-[11px] leading-relaxed text-fg-mute">
-                上とは向きが違い、相手のデータを自分の画面に入れるかどうかです。
-                相手が公開していても、ここを切れば合算されません。
+          {connectedTarget ? (
+            <>
+              <p className="mb-4 text-[11px] leading-relaxed text-fg-mute">
+                あなたのデータのうち、相手に見せるものを選びます。相手からは閲覧のみで、
+                書き換えはできません。試合結果は全ユーザー共通のデータなので、常に共有されます。
               </p>
+
               <div className="divide-hairline">
+                {LINK_RESOURCE_META.map((resource) => (
+                  <Toggle
+                    key={resource.id}
+                    checked={connectedTarget.shared[resource.id]}
+                    onChange={(next) => setPermission(connectedTarget, resource.id, next)}
+                    label={resource.label}
+                    hint={resource.hint}
+                  />
+                ))}
+              </div>
+            </>
+          ) : null}
+
+          <div className={connectedTarget ? 'mt-5 border-t border-line pt-4' : ''}>
+            <p className="eyebrow mb-1">あなたの集計に入れるもの</p>
+            <p className="mb-1 text-[11px] leading-relaxed text-fg-mute">
+              {connectedTarget
+                ? '上とは向きが違い、相手のデータを自分の画面に入れるかどうかです。相手が公開していても、ここを切れば合算されません。'
+                : 'この人を自分の画面に入れるかどうかです。'}
+            </p>
+            <div className="divide-hairline">
+              {connectedTarget ? (
                 <Toggle
-                  checked={memberOf(permissionTarget)!.join_saving}
-                  onChange={(next) => setJoin(memberOf(permissionTarget)!, 'join_saving', next)}
+                  checked={settingsMember.join_saving}
+                  onChange={(next) => setJoin(settingsMember, 'join_saving', next)}
                   disabled={busy}
                   label="ロッテ貯金を合算する"
                   hint="総累計貯金額と月間比較に、この人の分を入れる"
                 />
-                <Toggle
-                  checked={memberOf(permissionTarget)!.join_split}
-                  onChange={(next) => setJoin(memberOf(permissionTarget)!, 'join_split', next)}
-                  disabled={busy}
-                  label="割り勘に参加する"
-                  hint="割り勘のメンバーと、登録するときの候補に出す"
-                />
+              ) : null}
+              <Toggle
+                checked={settingsMember.join_split}
+                onChange={(next) => setJoin(settingsMember, 'join_split', next)}
+                disabled={busy}
+                label="割り勘に参加する"
+                hint="割り勘のメンバーと、登録するときの候補に出す"
+              />
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
+              割り勘を外しても、過去の記録と精算額は変わりません。
+              未精算が残っている人は、金額が見えなくならないように一覧へ出し続けます。
+            </p>
+          </div>
+
+          {connectedTarget ? (
+            <>
+              <div className="mt-5 border-t border-line pt-4">
+                <p className="eyebrow mb-2">相手があなたに公開しているもの</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {LINK_RESOURCE_META.filter((r) => connectedTarget.received[r.id]).length === 0 ? (
+                    <p className="text-[12px] text-fg-mute">なし</p>
+                  ) : (
+                    LINK_RESOURCE_META.filter((r) => connectedTarget.received[r.id]).map((r) => (
+                      <span
+                        key={r.id}
+                        className="rounded-full border border-line px-2.5 py-1 text-[11px] text-fg-dim"
+                      >
+                        {r.label}
+                      </span>
+                    ))
+                  )}
+                </div>
               </div>
-              <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
-                割り勘を外しても、過去の記録と精算額は変わりません。
-                未精算が残っている人は、金額が見えなくならないように一覧へ出し続けます。
-              </p>
-            </div>
-          ) : null}
 
-          <div className="mt-5 border-t border-line pt-4">
-            <p className="eyebrow mb-2">相手があなたに公開しているもの</p>
-            <div className="flex flex-wrap gap-1.5">
-              {LINK_RESOURCE_META.filter((r) => permissionTarget.received[r.id]).length === 0 ? (
-                <p className="text-[12px] text-fg-mute">なし</p>
-              ) : (
-                LINK_RESOURCE_META.filter((r) => permissionTarget.received[r.id]).map((r) => (
-                  <span
-                    key={r.id}
-                    className="rounded-full border border-line px-2.5 py-1 text-[11px] text-fg-dim"
-                  >
-                    {r.label}
-                  </span>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <Button
-              variant="danger"
-              full
-              disabled={busy}
-              onClick={() =>
-                disconnect(
-                  permissionTarget,
-                  `${partnerLabel(permissionTarget)} との接続を解除しますか？\n\n共有は双方向に停止します。再接続するには、もう一度リクエストと承認が必要です。\nメンバーそのものは残ります。`
-                )
-              }
-            >
-              <IconTrash size={17} />
-              接続を解除
-            </Button>
-          </div>
+              <div className="mt-6">
+                <Button
+                  variant="danger"
+                  full
+                  disabled={busy}
+                  onClick={() =>
+                    disconnect(
+                      connectedTarget,
+                      `${partnerLabel(connectedTarget)} との接続を解除しますか？\n\n共有は双方向に停止します。再接続するには、もう一度リクエストと承認が必要です。\nメンバーそのものは残ります。`
+                    )
+                  }
+                >
+                  <IconTrash size={17} />
+                  接続を解除
+                </Button>
+              </div>
+            </>
+          ) : (
+            <p className="mt-5 border-t border-line pt-4 text-[11px] leading-relaxed text-fg-mute">
+              まだ接続していません。Marine ID を登録して接続すると、
+              自分のデータを相手に見せるかどうかと、相手の貯金を合算するかどうかを選べます。
+            </p>
+          )}
         </Sheet>
       ) : null}
     </div>
