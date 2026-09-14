@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Amount, Card, DeltaBadge, SectionLabel, StatusPill } from '@/components/ui'
+import { Amount, Card, SectionLabel, StatusPill } from '@/components/ui'
 import { IconChevronRight, IconUsers, IconWallet } from '@/components/icons'
 import SavingsTrend from '@/components/home/SavingsTrend'
 import type { ChartPoint } from '@/components/charts/CumulativeChart'
@@ -15,7 +15,6 @@ import {
   depositedMonthSet,
   depositedTotal,
   formatWinRate,
-  monthOverMonth,
   seasonRecord,
   streakDays,
 } from '@/lib/insights'
@@ -53,7 +52,6 @@ export default async function HomePage() {
   const monthTotal = monthEntries.reduce((sum, e) => sum + e.amount, 0)
   const unpaid = records.filter((r) => r.status === 'unpaid')
   const unpaidTotal = unpaid.reduce((sum, r) => sum + r.amount, 0)
-  const delta = monthOverMonth(entries, month)
   const streak = streakDays(entries)
 
   // 貯金推移。入金済みの月だけを積む（累計貯金額と同じ定義）。
@@ -133,9 +131,8 @@ export default async function HomePage() {
       {/* 累計 */}
       <Card className="glow">
         <div className="eyebrow">累計貯金額</div>
-        <div className="mt-2 flex items-baseline gap-3">
+        <div className="mt-2">
           <Amount value={myTotal} size="xl" tone="marine" />
-          <DeltaBadge percent={delta} />
         </div>
         <div className="mt-1 text-[11px] text-fg-mute">
           1人分 / ワンバンクへ入金した金額の合計
@@ -146,7 +143,7 @@ export default async function HomePage() {
           <div className="mt-3 border-t border-line pt-3">
             <div className="eyebrow">総累計貯金額</div>
             <div className="mt-2">
-              <Amount value={circleTotal} size="lg" tone="marine" />
+              <Amount value={circleTotal} size="xl" tone="marine" />
             </div>
             <div className="mt-1 text-[11px] text-fg-mute">
               {circleSize}人分 / 合算しているメンバーを含む合計

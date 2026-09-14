@@ -1,27 +1,5 @@
-import { currentMonth, toMonth, today } from '@/lib/format'
+import { toMonth, today } from '@/lib/format'
 import type { MonthlySaving, SavingEntryRow } from '@/types'
-
-/** 'YYYY-MM' の N か月前を返す */
-export function shiftMonth(month: string, delta: number): string {
-  const [y, m] = month.split('-').map(Number)
-  if (!y || !m) return month
-  const date = new Date(y, m - 1 + delta, 1)
-  return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}`
-}
-
-export function sumByMonth(entries: SavingEntryRow[], month: string): number {
-  return entries.filter((e) => e.month === month).reduce((sum, e) => sum + e.amount, 0)
-}
-
-/**
- * 前月比（%）。前月の実績が0の場合は比較不能として null を返す。
- */
-export function monthOverMonth(entries: SavingEntryRow[], month = currentMonth()): number | null {
-  const prev = sumByMonth(entries, shiftMonth(month, -1))
-  if (prev <= 0) return null
-  const current = sumByMonth(entries, month)
-  return Math.round(((current - prev) / prev) * 1000) / 10
-}
 
 /**
  * 継続日数。

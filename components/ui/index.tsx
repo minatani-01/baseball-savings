@@ -609,23 +609,6 @@ export function Toggle({
   )
 }
 
-// -------------------------------------------------------------- Delta ----
-export function DeltaBadge({ percent }: { percent: number | null }) {
-  if (percent === null) return null
-  const up = percent >= 0
-  return (
-    <span
-      className={`tnum inline-flex items-center gap-1 text-[12px] font-medium ${
-        up ? 'text-teal' : 'text-danger'
-      }`}
-    >
-      {up ? '\u2191' : '\u2193'}
-      {up ? '+' : ''}
-      {percent}%
-    </span>
-  )
-}
-
 // ---------------------------------------------------------- Icon frame ----
 export function IconFrame({ children, tone = 'default' }: { children: ReactNode; tone?: 'default' | 'marine' }) {
   return (
