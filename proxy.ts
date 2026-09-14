@@ -48,7 +48,14 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  if (!signedIn && pathname !== '/login') {
+  // 未ログインでも通すパス。
+  // /auth/callback は OAuth から ?code= 付きで戻ってくる地点で、
+  // この時点ではまだセッションが無い。ここを弾くと code を交換できず、
+  // Google ログインが必ず失敗する。
+  const isPublic =
+    pathname === '/login' || pathname === '/auth' || pathname.startsWith('/auth/')
+
+  if (!signedIn && !isPublic) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
