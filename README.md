@@ -116,7 +116,8 @@ master への push で Vercel が Production を自動デプロイします。�
   `saving_entries` がユーザーごとの積立予定額を持ちます。
 - **過去の金額は再計算しない**。貯金ルールを変更しても、記録済みの試合の金額は保持されます。
 - **ワンバンク入金は月末に1回**。`monthly_savings` が
-  `calculating → ready → deposit_pending → deposited` の状態を管理します。
+  `calculating → ready → deposited` の状態を管理します。
+  入金はワンバンク側で一度に終わるため、間に「手続き中」は挟みません。
 - **UIに絵文字は使わない**（仕様書 4.1）。アイコンはすべて `components/icons.tsx` の SVG ラインアイコンです。
 - **累計貯金額は確定した月だけを数える**。月末に「確定」した `monthly_savings.confirmed_amount`
   の合計で、今月のように未確定の月は含めません（未確定分は見込みとして別に扱います）。

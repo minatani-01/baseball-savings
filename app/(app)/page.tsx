@@ -36,7 +36,6 @@ type Activity = {
 const STATUS_TONE: Record<MonthlyStatus, 'neutral' | 'marine' | 'warn' | 'done'> = {
   calculating: 'neutral',
   ready: 'marine',
-  deposit_pending: 'warn',
   deposited: 'done',
 }
 

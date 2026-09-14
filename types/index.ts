@@ -105,7 +105,8 @@ export type SavingRules = {
   monthly_goal_amount: number
 }
 
-export type MonthlyStatus = 'calculating' | 'ready' | 'deposit_pending' | 'deposited'
+/** 月末フロー。入金はワンバンク側で一度に終わるので中間状態は持たない */
+export type MonthlyStatus = 'calculating' | 'ready' | 'deposited'
 
 export type MonthlySaving = {
   id: string

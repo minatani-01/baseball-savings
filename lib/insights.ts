@@ -91,7 +91,7 @@ export function confirmedMonthSet(monthlySavings: MonthlySaving[]): Set<string> 
       .filter(
         (m) =>
           m.confirmed_amount !== null &&
-          (m.status === 'ready' || m.status === 'deposit_pending' || m.status === 'deposited')
+          (m.status === 'ready' || m.status === 'deposited')
       )
       .map((m) => m.month)
   )
@@ -103,7 +103,7 @@ export function confirmedTotal(monthlySavings: MonthlySaving[]): number {
     .filter(
       (m) =>
         m.confirmed_amount !== null &&
-        (m.status === 'ready' || m.status === 'deposit_pending' || m.status === 'deposited')
+        (m.status === 'ready' || m.status === 'deposited')
     )
     .reduce((sum, m) => sum + (m.confirmed_amount ?? 0), 0)
 }

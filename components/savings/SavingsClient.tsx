@@ -45,7 +45,6 @@ import type { MonthlySaving, MonthlyStatus, SavingEntryRow, SavingRules, SharedG
 const STATUS_TONE: Record<MonthlyStatus, 'neutral' | 'marine' | 'warn' | 'done'> = {
   calculating: 'neutral',
   ready: 'marine',
-  deposit_pending: 'warn',
   deposited: 'done',
 }
 
@@ -308,28 +307,6 @@ export default function SavingsClient({
                   <CopyAmountButton amount={displayAmount} label={`${yen(displayAmount)}をコピー`} />
                   <OpenAppButton app="onebank" />
                 </div>
-                <Button full disabled={busy} onClick={() => updateMonthly({ status: 'deposit_pending' })}>
-                  入金手続き中にする
-                </Button>
-                <Button
-                  variant="ghost"
-                  full
-                  disabled={busy}
-                  onClick={() =>
-                    updateMonthly({ status: 'calculating', confirmed_amount: null, confirmed_at: null })
-                  }
-                >
-                  確定を取り消す
-                </Button>
-              </>
-            ) : null}
-
-            {status === 'deposit_pending' ? (
-              <>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <CopyAmountButton amount={displayAmount} label={`${yen(displayAmount)}をコピー`} />
-                  <OpenAppButton app="onebank" />
-                </div>
                 <Button
                   variant="primary"
                   full
@@ -340,8 +317,15 @@ export default function SavingsClient({
                 >
                   入金済みにする
                 </Button>
-                <Button variant="ghost" full disabled={busy} onClick={() => updateMonthly({ status: 'ready' })}>
-                  確定済みに戻す
+                <Button
+                  variant="ghost"
+                  full
+                  disabled={busy}
+                  onClick={() =>
+                    updateMonthly({ status: 'calculating', confirmed_amount: null, confirmed_at: null })
+                  }
+                >
+                  確定を取り消す
                 </Button>
               </>
             ) : null}
@@ -357,7 +341,7 @@ export default function SavingsClient({
                   variant="ghost"
                   full
                   disabled={busy}
-                  onClick={() => updateMonthly({ status: 'deposit_pending', deposited_at: null })}
+                  onClick={() => updateMonthly({ status: 'ready', deposited_at: null })}
                 >
                   入金済みを取り消す
                 </Button>

@@ -81,7 +81,6 @@ export function pitchingHighlightLabel(id: PitchingHighlight): string {
 export const MONTHLY_STATUS_LABEL: Record<MonthlyStatus, string> = {
   calculating: '月内集計中',
   ready: '月末金額確定',
-  deposit_pending: 'ワンバンク入金待ち',
   deposited: '入金済み',
 }
 
