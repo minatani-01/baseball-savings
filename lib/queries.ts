@@ -3,6 +3,12 @@ import { createClient } from '@/lib/supabase/server'
 import { DEFAULT_SAVING_RULES } from '@/lib/savings'
 import type {
   Game,
+  LinkMonthlyCompare,
+  LinkPermissionRow,
+  LinkResource,
+  LinkResourceFlags,
+  MarineLinkRow,
+  MarineLinkView,
   MonthlySaving,
   Profile,
   SavingEntryRow,
@@ -10,6 +16,12 @@ import type {
   SplitMember,
   SplitRecord,
 } from '@/types'
+
+export const LINK_RESOURCES: LinkResource[] = ['saving', 'saving_rules', 'monthly', 'split']
+
+function emptyFlags(): LinkResourceFlags {
+  return { saving: false, saving_rules: false, monthly: false, split: false }
+}
 
 /**
  * サーバーコンポーネント用の読み取りヘルパー。
@@ -176,4 +188,106 @@ export async function getRecentGames(limit = 60): Promise<Game[]> {
     supabase.from('games').select('*').order('game_date', { ascending: false }).limit(limit)
   )
   return data ?? []
+}
+
+// ------------------------------------------------ Marine Link (Phase 4) ----
+
+/**
+ * 自分が当事者の接続を、画面が扱いやすい形にして返す。
+ *
+ * RLS 側でも当事者以外は弾かれるが、意図を明示するためクエリでも絞る。
+ * 相手のプロフィールは profiles_select_linked で読めるが、相手がまだ
+ * プロフィール行を作っていないこともあるので name/marine_id は空を許容する。
+ */
+export async function getMarineLinks(userId: string): Promise<MarineLinkView[]> {
+  const supabase = await createClient()
+
+  const links = await read<MarineLinkRow[]>('marine_links', () =>
+    supabase
+      .from('marine_links')
+      .select('*')
+      .or(`user_a.eq.${userId},user_b.eq.${userId}`)
+      .order('created_at', { ascending: false })
+  )
+  if (!links || links.length === 0) return []
+
+  const linkIds = links.map((l) => l.id)
+  const partnerIds = links.map((l) => (l.user_a === userId ? l.user_b : l.user_a))
+
+  const [permissions, profiles] = await Promise.all([
+    read<LinkPermissionRow[]>('link_permissions', () =>
+      supabase.from('link_permissions').select('*').in('marine_link_id', linkIds)
+    ),
+    read<Profile[]>('profiles', () =>
+      supabase.from('profiles').select('*').in('id', partnerIds)
+    ),
+  ])
+
+  const profileById = new Map((profiles ?? []).map((p) => [p.id, p]))
+
+  return links.map((link) => {
+    const partnerId = link.user_a === userId ? link.user_b : link.user_a
+    const partner = profileById.get(partnerId)
+    const shared = emptyFlags()
+    const received = emptyFlags()
+
+    for (const row of permissions ?? []) {
+      if (row.marine_link_id !== link.id) continue
+      if (row.owner_id === userId) shared[row.resource_type] = row.permission
+      else if (row.owner_id === partnerId) received[row.resource_type] = row.permission
+    }
+
+    return {
+      id: link.id,
+      status: link.status,
+      partner_id: partnerId,
+      partner_name: partner?.display_name ?? '',
+      partner_marine_id: partner?.marine_id ?? '',
+      outgoing: link.requested_by === userId,
+      shared,
+      received,
+      created_at: link.created_at,
+    }
+  })
+}
+
+/**
+ * 仕様書 16章の月間比較。接続済みの相手について、当月の積立額を返す。
+ *
+ * 相手が貯金を共有していない場合、RLS で行が返らない。その状態を 0 円と
+ * 区別できないと「相手は貯金していない」と誤読させるので、権限が無いことを
+ * null で表す。
+ */
+export async function getLinkMonthlyCompare(
+  links: MarineLinkView[],
+  month: string
+): Promise<LinkMonthlyCompare[]> {
+  const connected = links.filter((l) => l.status === 'accepted')
+  if (connected.length === 0) return []
+
+  const visible = connected.filter((l) => l.received.saving)
+  const amountByUser = new Map<string, number>()
+
+  if (visible.length > 0) {
+    const supabase = await createClient()
+    const rows = await read<{ user_id: string; amount: number }[]>('saving_entries', () =>
+      supabase
+        .from('saving_entries')
+        .select('user_id, amount')
+        .in(
+          'user_id',
+          visible.map((l) => l.partner_id)
+        )
+        .eq('month', month)
+    )
+    for (const row of rows ?? []) {
+      amountByUser.set(row.user_id, (amountByUser.get(row.user_id) ?? 0) + row.amount)
+    }
+  }
+
+  return connected.map((link) => ({
+    partner_id: link.partner_id,
+    partner_name: link.partner_name,
+    partner_amount: link.received.saving ? (amountByUser.get(link.partner_id) ?? 0) : null,
+  }))
 }

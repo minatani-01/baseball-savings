@@ -385,6 +385,50 @@ export function Avatar({
   )
 }
 
+// ------------------------------------------------------------- Toggle ----
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  hint,
+  disabled = false,
+}: {
+  checked: boolean
+  onChange: (next: boolean) => void
+  label: ReactNode
+  hint?: ReactNode
+  disabled?: boolean
+}) {
+  return (
+    <label
+      className={`flex items-start justify-between gap-4 py-2.5 ${
+        disabled ? 'opacity-40' : 'cursor-pointer'
+      }`}
+    >
+      <span className="min-w-0">
+        <span className="block text-[13px]">{label}</span>
+        {hint ? <span className="mt-0.5 block text-[11px] text-fg-mute">{hint}</span> : null}
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-colors ${
+          checked ? 'border-marine/70 bg-marine/30' : 'border-line bg-white/[0.04]'
+        } disabled:pointer-events-none`}
+      >
+        <span
+          className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full transition-all ${
+            checked ? 'left-[24px] bg-marine' : 'left-[3px] bg-fg-mute'
+          }`}
+        />
+      </button>
+    </label>
+  )
+}
+
 // -------------------------------------------------------------- Delta ----
 export function DeltaBadge({ percent }: { percent: number | null }) {
   if (percent === null) return null

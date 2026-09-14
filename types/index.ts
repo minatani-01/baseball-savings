@@ -162,3 +162,59 @@ export type SplitRecord = {
   created_at: string
   updated_at: string
 }
+
+// ---------------------------------------------------- Marine Link (Phase 4) ----
+/** 共有できるリソース。観戦情報 / Marine Day / Beer Log は Phase 5 以降で追加する */
+export type LinkResource = 'saving' | 'saving_rules' | 'monthly' | 'split'
+export type MarineLinkStatus = 'pending' | 'accepted' | 'rejected'
+
+export type MarineLinkRow = {
+  id: string
+  /** リクエストを送った側 */
+  user_a: string
+  /** 受け取った側 */
+  user_b: string
+  status: MarineLinkStatus
+  requested_by: string
+  responded_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type LinkPermissionRow = {
+  id: string
+  marine_link_id: string
+  /** 共有する側。相手はこの行が true のリソースだけを見られる */
+  owner_id: string
+  resource_type: LinkResource
+  permission: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type LinkResourceFlags = Record<LinkResource, boolean>
+
+/** 画面が扱いやすい形にまとめた接続 */
+export type MarineLinkView = {
+  id: string
+  status: MarineLinkStatus
+  partner_id: string
+  /** 相手のプロフィールが読めないときは空文字 */
+  partner_name: string
+  partner_marine_id: string
+  /** 自分が送ったリクエストか */
+  outgoing: boolean
+  /** 自分が相手に見せているもの */
+  shared: LinkResourceFlags
+  /** 相手が自分に見せているもの */
+  received: LinkResourceFlags
+  created_at: string
+}
+
+/** 仕様書 16章の月間比較 */
+export type LinkMonthlyCompare = {
+  partner_id: string
+  partner_name: string
+  /** 相手が貯金を共有していないときは null */
+  partner_amount: number | null
+}
