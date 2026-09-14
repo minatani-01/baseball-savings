@@ -5,8 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button, Card, Field, Row, SectionLabel, inputClass } from '@/components/ui'
 import AvatarPicker from '@/components/AvatarPicker'
+import NotificationSettings from '@/components/me/NotificationSettings'
 import {
-  IconBell,
   IconCheck,
   IconChevronRight,
   IconCopy,
@@ -261,21 +261,7 @@ export default function MeClient({
         </Card>
       </div>
 
-      <div id="notifications" className="scroll-mt-20">
-        <SectionLabel>お知らせ</SectionLabel>
-        <Card>
-          <div className="flex items-start gap-3">
-            <IconBell size={18} className="mt-0.5 shrink-0 text-fg-mute" />
-            <div>
-              <p className="text-[13px]">通知はまだありません</p>
-              <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
-                試合開始・貯金額確定・月末入金・割り勘の精算依頼などのプッシュ通知は Phase 6
-                で実装予定です。
-              </p>
-            </div>
-          </div>
-        </Card>
-      </div>
+      <NotificationSettings userId={userId} />
 
       {/* メンバーと Marine Link は、共有を組み立てる側の機能なのでマスターだけに出す */}
       {profile?.is_master ? (

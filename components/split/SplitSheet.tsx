@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Avatar, Button, Chip, Field, Segmented, Sheet, inputClass } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
+import { notifyPartner } from '@/lib/notify-client'
 import { withTapFeedback } from '@/lib/haptics'
 import { distributeEqual, distributeRatio } from '@/lib/warikan'
 import { today, yen } from '@/lib/format'
 import { EXPENSE_CATEGORIES } from '@/lib/constants'
 import type {
   ExpenseCategory,
+  MarineLinkView,
   Share,
   SplitMemberView,
   SplitRecord,
@@ -26,16 +28,40 @@ const SPLIT_TYPES: { id: SplitType; label: string }[] = [
 export default function SplitSheet({
   record,
   members,
+  links,
   userId,
   onClose,
 }: {
   record: SplitRecord | null
   members: SplitMemberView[]
+  /** 接続している相手。登録したことを知らせる先を引くのに使う */
+  links: MarineLinkView[]
   userId: string
   onClose: () => void
 }) {
   const router = useRouter()
   const memberNames = useMemo(() => members.map((m) => m.name), [members])
+
+  /**
+   * 参加している人のうち、接続しているアカウントのIDを集める。
+   *
+   * メンバーは Marine ID で接続と結びつく。ID を登録していない人
+   * （アプリを使っていない人）には送りようがないので、そのまま飛ばす。
+   */
+  const partnerIdsIn = (names: string[]): string[] => {
+    const ids = new Set<string>()
+    for (const name of names) {
+      const marineId = members.find((m) => m.name === name)?.marine_id
+      if (!marineId) continue
+      const link = links.find(
+        (l) =>
+          l.status === 'accepted' &&
+          l.partner_marine_id.trim().toUpperCase() === marineId.trim().toUpperCase()
+      )
+      if (link) ids.add(link.partner_id)
+    }
+    return [...ids]
+  }
 
   const [date, setDate] = useState(record?.date ?? today())
   const [content, setContent] = useState(record?.content ?? '')
@@ -163,6 +189,15 @@ export default function SplitSheet({
       setError('保存に失敗しました')
       return
     }
+
+    // 登録したことを、その割り勘に入っている接続相手へ知らせる。
+    // 編集では鳴らさない。金額を直すたびに通知が飛ぶと煩わしい
+    if (!record) {
+      for (const partnerId of partnerIdsIn(selected)) {
+        notifyPartner('split_added', partnerId)
+      }
+    }
+
     onClose()
     router.refresh()
   }
