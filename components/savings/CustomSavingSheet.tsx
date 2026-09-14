@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Amount, Button, Chip, Field, Sheet, inputClass } from '@/components/ui'
+import { Amount, Button, Chip, Field, Sheet, inputClassCompact } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { today } from '@/lib/format'
 import type { SavingEntryRow, SavingRules } from '@/types'
@@ -105,38 +105,43 @@ export default function CustomSavingSheet({
         </div>
       }
     >
-      <div className="flex flex-col gap-5">
-        <Field label="日付">
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className={inputClass}
-          />
-        </Field>
+      <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="日付">
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className={inputClassCompact}
+            />
+          </Field>
 
-        <Field label="定型" hint="NPBから取得できないため、ここで積み立てます">
-          <div className="grid grid-cols-3 gap-2">
-            {PRESETS.map((preset) => (
-              <Chip
-                key={preset.key}
-                selected={title === preset.label}
-                onClick={() => applyPreset(preset)}
-                sub={`¥${Number(rules[preset.ruleKey]).toLocaleString()}`}
-              >
-                {preset.label}
-              </Chip>
-            ))}
-          </div>
-        </Field>
+          <Field label="定型" hint="NPB対象外">
+            <select
+              value={PRESETS.find((p) => p.label === title)?.key ?? ''}
+              onChange={(e) => {
+                const preset = PRESETS.find((p) => p.key === e.target.value)
+                if (preset) applyPreset(preset)
+              }}
+              className={inputClassCompact}
+            >
+              <option value="">選択しない</option>
+              {PRESETS.map((preset) => (
+                <option key={preset.key} value={preset.key}>
+                  {preset.label}　¥{Number(rules[preset.ruleKey]).toLocaleString()}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
 
-        <Field label="その他" hint="定型を選ぶと入ります。珍記録などは直接書いてください">
+        <Field label="その他" hint="定型を選ぶと入ります">
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="例: 代打逆転満塁ホームラン"
-            className={inputClass}
+            className={inputClassCompact}
           />
         </Field>
 
@@ -149,7 +154,7 @@ export default function CustomSavingSheet({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0"
-              className={`${inputClass} tnum`}
+              className={`${inputClassCompact} tnum`}
             />
             <div className="grid grid-cols-4 gap-2">
               {QUICK_AMOUNTS.map((v) => (
@@ -167,7 +172,7 @@ export default function CustomSavingSheet({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="残しておきたいこと"
-            className={inputClass}
+            className={inputClassCompact}
           />
         </Field>
 
