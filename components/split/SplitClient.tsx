@@ -122,6 +122,28 @@ export default function SplitClient({
     }
   }, [unpaid, memberNames])
 
+  /**
+   * 割り勘に出すメンバー。
+   *
+   * 精算の計算（dueTotals / transfers）は members 全員で行う。
+   * 参加を外した人の未精算が計算から消えると、払うべき額が合わなくなるため。
+   * ここで絞るのは見た目と、これから登録するときの候補だけ。
+   *
+   * 未精算が残っている人は、外していても一覧に出す。
+   * 金額が見えなくなると、精算の欄にだけ名前が出て辻褄が合わなくなる。
+   */
+  const listedMembers = useMemo(
+    () => members.filter((m) => m.join_split || (dueTotals.get(m.name) ?? 0) !== 0),
+    [members, dueTotals]
+  )
+
+  /** 登録シートに渡す顔ぶれ。編集中の記録に載っている人は、外していても残す */
+  const selectableMembers = useMemo(() => {
+    const onRecord = new Set((editing?.shares ?? []).map((share) => share.member))
+    if (editing?.payer) onRecord.add(editing.payer)
+    return members.filter((m) => m.join_split || onRecord.has(m.name))
+  }, [members, editing])
+
   const visible = useMemo(() => {
     const base = filter === 'unpaid' ? unpaid : filter === 'paid' ? paid : records
     return [...base].sort((a, b) => {
@@ -210,13 +232,13 @@ export default function SplitClient({
           メンバー
         </SectionLabel>
         <Card>
-          {members.length === 0 ? (
+          {listedMembers.length === 0 ? (
             <p className="text-[13px] text-fg-mute">
               メンバーが未登録です。「編集」から追加してください。
             </p>
           ) : (
             <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
-              {members.map((m) => (
+              {listedMembers.map((m) => (
                 <div key={m.id} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
                   <Avatar name={m.name} src={m.avatar_url} selected={m.is_self} />
                   <span className="w-full truncate text-center text-[11px] text-fg-dim">
@@ -249,7 +271,7 @@ export default function SplitClient({
               </Link>
             </div>
           )}
-          {members.length > 0 ? (
+          {listedMembers.length > 0 ? (
             <p className="mt-3 border-t border-line pt-3 text-[11px] leading-relaxed text-fg-mute">
               金額は未精算ぶんの精算額です。プラスはその人が払う金額、
               マイナスは受け取る金額を表します。
@@ -449,7 +471,7 @@ export default function SplitClient({
       {sheetOpen ? (
         <SplitSheet
           record={editing}
-          members={members}
+          members={selectableMembers}
           userId={userId}
           onClose={() => {
             setSheetOpen(false)

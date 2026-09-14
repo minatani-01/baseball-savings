@@ -122,26 +122,30 @@ export default function MembersClient({
   }
 
   /**
-   * 総累計貯金額にその人を含めるかどうか。
+   * その人を自分の画面に入れるかどうか。
    *
    * 共有設定（相手に自分のデータを見せるか）とは向きが違う。
-   * こちらは「自分の集計に相手を入れるか」なので、
-   * 相手が公開していても、こちらで外せば合算されない。
+   * こちらは「相手のデータを自分の集計に入れるか」なので、
+   * 相手が公開していても、こちらで外せば入らない。
    *
-   * 割り勘は、メンバーに載っていること自体が参加を意味するので設定を持たない
-   * （割り勘から外したいときはメンバーごと消す）。
+   * 割り勘を外しても、過去の記録と精算額は変わらない。
+   * 消えるのは、これから登録するときの候補と、メンバーの一覧だけ。
    */
-  const setJoinSaving = async (member: SplitMemberView, next: boolean) => {
+  const setJoin = async (
+    member: SplitMemberView,
+    field: 'join_split' | 'join_saving',
+    next: boolean
+  ) => {
     setBusy(true)
     setError(null)
     const supabase = createClient()
     const { error } = await supabase
       .from('split_members')
-      .update({ join_saving: next })
+      .update({ [field]: next })
       .eq('id', member.id)
     setBusy(false)
     if (error) {
-      setError('合算の設定を保存できませんでした')
+      setError('設定を保存できませんでした')
       return
     }
     router.refresh()
@@ -690,16 +694,25 @@ export default function MembersClient({
                 上とは向きが違い、相手のデータを自分の画面に入れるかどうかです。
                 相手が公開していても、ここを切れば合算されません。
               </p>
-              <Toggle
-                checked={memberOf(permissionTarget)!.join_saving}
-                onChange={(next) => setJoinSaving(memberOf(permissionTarget)!, next)}
-                disabled={busy}
-                label="ロッテ貯金を合算する"
-                hint="総累計貯金額と月間比較に、この人の分を入れる"
-              />
+              <div className="divide-hairline">
+                <Toggle
+                  checked={memberOf(permissionTarget)!.join_saving}
+                  onChange={(next) => setJoin(memberOf(permissionTarget)!, 'join_saving', next)}
+                  disabled={busy}
+                  label="ロッテ貯金を合算する"
+                  hint="総累計貯金額と月間比較に、この人の分を入れる"
+                />
+                <Toggle
+                  checked={memberOf(permissionTarget)!.join_split}
+                  onChange={(next) => setJoin(memberOf(permissionTarget)!, 'join_split', next)}
+                  disabled={busy}
+                  label="割り勘に参加する"
+                  hint="割り勘のメンバーと、登録するときの候補に出す"
+                />
+              </div>
               <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
-                割り勘はメンバーに載っていること自体が参加なので、設定はありません。
-                外したいときはメンバーごと削除してください。
+                割り勘を外しても、過去の記録と精算額は変わりません。
+                未精算が残っている人は、金額が見えなくならないように一覧へ出し続けます。
               </p>
             </div>
           ) : null}
