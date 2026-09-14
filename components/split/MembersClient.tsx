@@ -2,7 +2,16 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Avatar, Button, Card, EmptyState, IconButton, SectionLabel, inputClass } from '@/components/ui'
+import {
+  Avatar,
+  Button,
+  Card,
+  Checkbox,
+  EmptyState,
+  IconButton,
+  SectionLabel,
+  inputClass,
+} from '@/components/ui'
 import { IconCheck, IconLink, IconPlus, IconTrash } from '@/components/icons'
 import { createClient } from '@/lib/supabase/client'
 import type { SplitMember } from '@/types'
@@ -23,6 +32,22 @@ export default function MembersClient({
   const [savedId, setSavedId] = useState<string | null>(null)
 
   const draftOf = (member: SplitMember) => draftIds[member.id] ?? member.marine_id ?? ''
+
+  const setJoin = async (member: SplitMember, field: 'join_split' | 'join_saving', next: boolean) => {
+    setBusy(true)
+    setError(null)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('split_members')
+      .update({ [field]: next })
+      .eq('id', member.id)
+    setBusy(false)
+    if (error) {
+      setError('参加設定の保存に失敗しました')
+      return
+    }
+    router.refresh()
+  }
 
   const saveMarineId = async (member: SplitMember) => {
     const raw = draftOf(member).trim().toUpperCase()
@@ -102,11 +127,13 @@ export default function MembersClient({
   return (
     <div className="flex flex-col gap-6">
       <p className="text-[13px] leading-relaxed text-fg-mute">
-        割り勘に参加するメンバーです。人数の上限はありません。
+        Marine Wallet を一緒に使う人をここで管理します。人数の上限はありません。
         名前を変更・削除しても、過去の記録に保存された名前と負担額は変わりません。
-        メンバーが Marine Wallet を使っているなら Marine ID を登録してください。
-        Marine Link で接続済みの相手なら、そのメンバーが参加している割り勘だけが相手から見えるようになります
-        （参加していない割り勘は見えません。相手が書き換えることもできません）。
+        {'\n'}
+        相手が Marine Wallet を使っているなら Marine ID を登録し、参加する機能を選んでください。
+        割り勘は、Marine Link で接続済みかつ Marine ID が一致するメンバーが参加している記録だけが
+        相手から見えます（参加していない記録は見えません。相手が書き換えることもできません）。
+        貯金は、参加しているメンバーの確定済みの積立額が総累計貯金額に合算されます。
       </p>
 
       <div>
@@ -143,9 +170,9 @@ export default function MembersClient({
                   </IconButton>
                 </div>
 
-                {/* Marine ID。登録するとこの人が参加した割り勘が相手から見えるようになる */}
-                {member.is_self ? null : (
-                  <div className="mt-2.5 border-t border-line pt-2.5">
+                <div className="mt-2.5 border-t border-line pt-2.5">
+                  {/* Marine ID。登録するとこの人が参加した割り勘が相手から見えるようになる */}
+                  {member.is_self ? null : (
                     <div className="flex items-center gap-2">
                       <IconLink size={15} className="shrink-0 text-fg-mute" />
                       <input
@@ -174,13 +201,31 @@ export default function MembersClient({
                         {savedId === member.id ? <IconCheck size={15} /> : '保存'}
                       </Button>
                     </div>
-                    {member.marine_id ? (
-                      <p className="mt-1.5 text-[11px] leading-relaxed text-teal">
-                        接続済みなら、このメンバーが参加している割り勘が相手から見えます。
-                      </p>
-                    ) : null}
+                  )}
+
+                  {/* 参加する機能 */}
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] text-fg-mute">参加</span>
+                    <Checkbox
+                      checked={member.join_split}
+                      onChange={(next) => setJoin(member, 'join_split', next)}
+                      disabled={busy}
+                      label="割り勘"
+                    />
+                    <Checkbox
+                      checked={member.join_saving}
+                      onChange={(next) => setJoin(member, 'join_saving', next)}
+                      disabled={busy}
+                      label="貯金"
+                    />
                   </div>
-                )}
+
+                  {member.join_saving && !member.is_self && !member.marine_id ? (
+                    <p className="mt-1.5 text-[11px] leading-relaxed text-warn">
+                      貯金に参加するには Marine ID の登録が必要です。
+                    </p>
+                  ) : null}
+                </div>
               </Card>
             ))}
           </div>

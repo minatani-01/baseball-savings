@@ -14,6 +14,7 @@ import {
   getSavingEntries,
   getSavingRules,
   getSessionUser,
+  getSavingCircleTotals,
   getSplitRecords,
 } from '@/lib/queries'
 import { monthOverMonth, streakDays } from '@/lib/insights'
@@ -43,15 +44,19 @@ export default async function HomePage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const [entries, monthlySavings, records, rules] = await Promise.all([
+  const [entries, monthlySavings, records, rules, circle] = await Promise.all([
     getSavingEntries(user.id),
     getMonthlySavings(user.id),
     getSplitRecords(user.id),
     getSavingRules(user.id),
+    getSavingCircleTotals(),
   ])
 
   const month = currentMonth()
-  const total = entries.reduce((sum, e) => sum + e.amount, 0)
+  // 累計貯金額は「月末に確定した月次金額」の合計。今月のように未確定の月は含めない
+  const myTotal = circle.find((row) => row.is_self)?.confirmed ?? 0
+  const circleTotal = circle.reduce((sum, row) => sum + row.confirmed, 0)
+  const circleSize = circle.filter((row) => row.is_visible).length
   const monthEntries = entries.filter((e) => e.month === month)
   const monthTotal = monthEntries.reduce((sum, e) => sum + e.amount, 0)
   const unpaid = records.filter((r) => r.status === 'unpaid')
@@ -111,9 +116,22 @@ export default async function HomePage() {
       <Card className="glow">
         <div className="eyebrow">累計貯金額</div>
         <div className="mt-2 flex items-baseline gap-3">
-          <Amount value={total} size="xl" tone="marine" />
+          <Amount value={myTotal} size="xl" tone="marine" />
           <DeltaBadge percent={delta} />
         </div>
+        <div className="mt-1 text-[11px] text-fg-mute">
+          1人分 / 月末に確定した金額の合計（今月分は含みません）
+        </div>
+
+        {circleSize > 1 ? (
+          <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-line pt-3">
+            <div>
+              <div className="eyebrow">総累計貯金額</div>
+              <div className="mt-0.5 text-[11px] text-fg-mute">{circleSize}人分</div>
+            </div>
+            <div className="tnum text-xl font-semibold">{yen(circleTotal)}</div>
+          </div>
+        ) : null}
 
         <div className="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-4">
           <div>

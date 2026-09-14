@@ -138,6 +138,10 @@ export type SplitMember = {
    * このメンバーが参加している割り勘だけが見えるようになる（0007のRLS）。
    */
   marine_id: string | null
+  /** 割り勘に参加するか */
+  join_split: boolean
+  /** 貯金に参加するか（総累計貯金額の集計対象になる） */
+  join_saving: boolean
   created_at: string
   updated_at: string
 }
@@ -228,4 +232,20 @@ export type LinkMonthlyCompare = {
   partner_name: string
   /** 相手が貯金を共有していないときは null */
   partner_amount: number | null
+}
+
+/**
+ * 貯金の参加者ごとの累計（0008 の saving_circle_totals）。
+ *
+ * confirmed は「月末に確定した月次金額」の合計で、今月など未確定の月は含まない。
+ * pending は未確定の月の見込みで、累計には足さない。
+ * 相手が貯金を共有していない場合は is_visible=false になり、0円と区別できる。
+ */
+export type SavingCircleTotal = {
+  member_name: string
+  marine_id: string
+  is_self: boolean
+  is_visible: boolean
+  confirmed: number
+  pending: number
 }

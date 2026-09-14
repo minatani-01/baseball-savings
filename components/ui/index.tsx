@@ -1,7 +1,7 @@
 'use client'
 
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { IconClose } from '@/components/icons'
+import { IconCheck, IconClose } from '@/components/icons'
 import { yen } from '@/lib/format'
 
 // ---------------------------------------------------------------- Card ----
@@ -382,6 +382,44 @@ export function Avatar({
     >
       {initial}
     </span>
+  )
+}
+
+// ----------------------------------------------------------- Checkbox ----
+export function Checkbox({
+  checked,
+  onChange,
+  label,
+  disabled = false,
+}: {
+  checked: boolean
+  onChange: (next: boolean) => void
+  label: ReactNode
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] transition-colors disabled:opacity-40 ${
+        checked
+          ? 'border-marine/60 bg-marine/10 text-marine'
+          : 'border-line text-fg-mute hover:border-marine/40'
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`inline-flex h-4 w-4 items-center justify-center rounded border ${
+          checked ? 'border-marine bg-marine text-ink' : 'border-line'
+        }`}
+      >
+        {checked ? <IconCheck size={12} /> : null}
+      </span>
+      {label}
+    </button>
   )
 }
 

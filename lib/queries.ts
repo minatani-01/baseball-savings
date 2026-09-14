@@ -13,6 +13,7 @@ import type {
   Profile,
   SavingEntryRow,
   SavingRules,
+  SavingCircleTotal,
   SharedSplitRecord,
   SplitMember,
   SplitRecord,
@@ -332,5 +333,23 @@ export async function getSharedSplitRecords(userId: string): Promise<SharedSplit
     ...row,
     owner_name: ownerById.get(row.user_id)?.display_name ?? '',
     owner_marine_id: ownerById.get(row.user_id)?.marine_id ?? '',
+  }))
+}
+
+/**
+ * 貯金の参加者ごとの累計（自分＋貯金に参加している接続済みメンバー）。
+ *
+ * 「累計貯金額」は月末に確定した月次金額の合計とする。今月のように
+ * まだ確定していない月は累計に含めず、pending として別に返す。
+ */
+export async function getSavingCircleTotals(): Promise<SavingCircleTotal[]> {
+  const supabase = await createClient()
+  const rows = await read<SavingCircleTotal[]>('saving_circle_totals', () =>
+    supabase.rpc('saving_circle_totals')
+  )
+  return (rows ?? []).map((row) => ({
+    ...row,
+    confirmed: Number(row.confirmed),
+    pending: Number(row.pending),
   }))
 }
