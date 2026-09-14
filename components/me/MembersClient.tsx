@@ -24,6 +24,7 @@ import {
   IconTrash,
 } from '@/components/icons'
 import { createClient } from '@/lib/supabase/client'
+import { notifyPartner } from '@/lib/notify-client'
 import { rejectReason, removeAvatarFile, uploadAvatar } from '@/lib/avatar'
 import { LINK_RESOURCE_META } from '@/lib/constants'
 import { monthLabel } from '@/lib/format'
@@ -107,6 +108,13 @@ export default function MembersClient({
       ),
     [connected, members]
   )
+
+  /**
+   * Marine ID から相手のユーザーIDを引く。
+   * 接続が無いうちは分からないので、そのときは通知を送らない。
+   */
+  const partnerIdOf = (marineId: string | null) =>
+    links.find((l) => sameId(l.partner_marine_id, marineId))?.partner_id ?? null
 
   const settingsMember = members.find((m) => m.id === settingsMemberId) ?? null
 
@@ -205,6 +213,10 @@ export default function MembersClient({
       setError(error.message)
       return
     }
+    // マスターからのリクエストはその場で成立するので、相手には接続された旨を送る。
+    // それ以外は承認を待つ状態なので、リクエストが届いたことを知らせる
+    const partnerId = partnerIdOf(member.marine_id)
+    notifyPartner(isMaster ? 'link_accepted' : 'link_request', partnerId)
     router.refresh()
   }
 
@@ -218,6 +230,8 @@ export default function MembersClient({
       setError(error.message)
       return
     }
+    // 断ったことは知らせない。承認したときだけ相手に届ける
+    if (status === 'accepted') notifyPartner('link_accepted', link.partner_id)
     router.refresh()
   }
 

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 
 import { runNpbSync } from '@/lib/npb/sync'
+import { isJstMonthEnd, jstMonth, jstYesterday } from '@/lib/jst'
+import { messageForGames, messageForMonthEnd } from '@/lib/notifications'
+import { sendPushToAll } from '@/lib/push'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 /**
@@ -63,8 +66,10 @@ export async function GET(request: Request) {
       .eq('id', run.id)
   }
 
+  const now = new Date()
+
   try {
-    const result = await runNpbSync(new Date())
+    const result = await runNpbSync(now)
 
     if (result.games.length > 0) {
       const { error } = await supabase
@@ -80,6 +85,29 @@ export async function GET(request: Request) {
       if (error) throw new Error(`スナップショットの保存に失敗しました: ${error.message}`)
     }
 
+    // 取り込みの知らせ。前日までに終わった試合があるときだけ送る。
+    // 中止や試合の無い日に「取り込みました」と鳴らしても意味がない
+    const yesterday = jstYesterday(now)
+    const finishedYesterday = result.games.filter(
+      (g) => g.status === 'finished' && g.game_date === yesterday
+    )
+    const notified: Record<string, unknown> = {}
+
+    if (finishedYesterday.length > 0) {
+      const latest = finishedYesterday[finishedYesterday.length - 1]
+      notified.games = await sendPushToAll(
+        messageForGames(
+          finishedYesterday.length,
+          `${latest.home_team} ${latest.home_score ?? '-'}-${latest.away_score ?? '-'} ${latest.away_team}`
+        )
+      )
+    }
+
+    // 月末の確定と入金のリマインド。日本時間で月の最終日にだけ送る
+    if (isJstMonthEnd(now)) {
+      notified.monthEnd = await sendPushToAll(messageForMonthEnd(jstMonth(now)))
+    }
+
     const summary = {
       pages: result.pages,
       games: result.games.length,
@@ -87,6 +115,7 @@ export async function GET(request: Request) {
       battingAsOf: result.battingAsOf,
       pitchingAsOf: result.pitchingAsOf,
       warnings: result.warnings,
+      notified,
     }
 
     // 警告があっても保存自体は成功しているので ok にする。

@@ -26,6 +26,7 @@ import { dueYen, shortDate, yen } from '@/lib/format'
 import { categoryLabel } from '@/lib/constants'
 import type {
   Share,
+  MarineLinkView,
   SharedSplitRecord,
   SortOrder,
   SplitFilter,
@@ -44,12 +45,15 @@ export default function SplitClient({
   userId,
   records,
   members,
+  links,
   shared,
   openNew = false,
 }: {
   userId: string
   records: SplitRecord[]
   members: SplitMemberView[]
+  /** 接続している相手。登録したことを知らせる先を引くのに使う */
+  links: MarineLinkView[]
   /** 相手から共有されている割り勘。閲覧のみで編集はできない */
   shared: SharedSplitRecord[]
   /** ホームの「割り勘を作成」から来たか。真なら登録シートを開いて始める */
@@ -472,6 +476,7 @@ export default function SplitClient({
         <SplitSheet
           record={editing}
           members={selectableMembers}
+          links={links}
           userId={userId}
           onClose={() => {
             setSheetOpen(false)
