@@ -92,10 +92,15 @@ export const PITCHING_HIGHLIGHTS: { id: PitchingHighlight; label: string }[] = [
  *                    壊れやすい推定は入れず、カスタム登録で積み立てる
  *                    （docs/npb-data-sources.md 3章）
  */
-const NOT_AUTO_HIGHLIGHTS: PitchingHighlight[] = ['quality_start', 'no_hitter', 'perfect_game']
+/**
+ * 並びは貯金ルールの「投手」に合わせる。
+ * 金額を決める画面と選ぶ画面で順番が違うと、探すときに迷うため。
+ * PITCHING_HIGHLIGHTS の並び（珍しい順）は表示用のラベル引きに使う。
+ */
+const AUTO_HIGHLIGHT_ORDER: PitchingHighlight[] = ['none', 'shutout', 'complete_game']
 
 export const AUTO_PITCHING_HIGHLIGHTS: { id: PitchingHighlight; label: string }[] =
-  PITCHING_HIGHLIGHTS.filter((p) => !NOT_AUTO_HIGHLIGHTS.includes(p.id))
+  AUTO_HIGHLIGHT_ORDER.map((id) => PITCHING_HIGHLIGHTS.find((p) => p.id === id)!)
 
 export function pitchingHighlightLabel(id: PitchingHighlight): string {
   return PITCHING_HIGHLIGHTS.find((p) => p.id === id)?.label ?? id

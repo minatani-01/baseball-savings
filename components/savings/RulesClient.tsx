@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Card, SectionLabel, inputClassCompact } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
-import { IconPlus, IconTrash } from '@/components/icons'
+import { IconChevronDown, IconChevronUp, IconPlus, IconTrash } from '@/components/icons'
 import { DEFAULT_SAVING_RULES } from '@/lib/savings'
 import type { SavingCustomPreset, SavingRules } from '@/types'
 
@@ -136,6 +136,53 @@ export default function RulesClient({
     else setPresetError(null)
   }
 
+  /**
+   * 定型の並びを1つ入れ替える。
+   *
+   * カスタム登録のプルダウンはこの順で出るので、よく使うものを上に置ける。
+   * sort_order を隣と交換して、2行ぶんを書き換える。
+   */
+  const movePreset = async (index: number, direction: -1 | 1) => {
+    const target = index + direction
+    if (target < 0 || target >= presets.length) return
+
+    const a = presets[index]
+    const b = presets[target]
+
+    // 並びが同じ値で作られていると交換しても動かないので、
+    // 位置から採り直して必ず差がつくようにする
+    const next = [...presets]
+    next[index] = b
+    next[target] = a
+    const renumbered = next.map((p, i) => ({ ...p, sort_order: (i + 1) * 10 }))
+
+    const before = presets
+    setPresets(renumbered)
+    setPresetBusy(true)
+
+    const supabase = createClient()
+    const results = await Promise.all(
+      renumbered
+        // 値が変わった行だけ書き戻す
+        .filter((p, i) => p.sort_order !== before[i]?.sort_order || p.id !== before[i]?.id)
+        .map((p) =>
+          supabase
+            .from('saving_custom_presets')
+            .update({ sort_order: p.sort_order, updated_by: userId })
+            .eq('id', p.id)
+        )
+    )
+    setPresetBusy(false)
+
+    if (results.some((r) => r.error)) {
+      setPresets(before)
+      setPresetError('並びを保存できませんでした')
+      return
+    }
+    setPresetError(null)
+    router.refresh()
+  }
+
   const removePreset = async (id: string) => {
     const before = presets
     setPresets((prev) => prev.filter((p) => p.id !== id))
@@ -237,19 +284,71 @@ export default function RulesClient({
       ))}
 
       <div>
+        <SectionLabel>フェーズ倍率</SectionLabel>
+        <Card>
+          <div className="divide-hairline">
+            {MULTIPLIERS.map((item) => (
+              <div key={item.key} className="flex items-center justify-between gap-4 py-2.5">
+                <label htmlFor={item.key} className="text-[13px] text-fg-dim">
+                  {item.label}
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-fg-mute">×</span>
+                  <input
+                    id={item.key}
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    max={10}
+                    step={0.1}
+                    value={rules[item.key]}
+                    onChange={(e) => setMultiplier(item.key, e.target.value)}
+                    disabled={!canEdit}
+                className={numberInput}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      <div>
         <SectionLabel>カスタム登録の定型</SectionLabel>
         <Card>
           <p className="mb-3 text-[11px] leading-relaxed text-fg-mute">
             NPBから取得できない記録を、カスタム登録のプルダウンに並べます。
-            ここで追加したものがそのまま選べるようになります。
+            ここでの並び順がそのままプルダウンの順になります。
           </p>
 
           {presets.length === 0 ? (
             <p className="py-2 text-[13px] text-fg-mute">定型はまだありません。</p>
           ) : (
             <div className="divide-hairline">
-              {presets.map((preset) => (
-                <div key={preset.id} className="flex items-center justify-between gap-3 py-2.5">
+              {presets.map((preset, index) => (
+                <div key={preset.id} className="flex items-center justify-between gap-2 py-2.5">
+                  {canEdit ? (
+                    <div className="flex shrink-0 flex-col">
+                      <button
+                        type="button"
+                        aria-label={`${preset.label}を上へ`}
+                        onClick={() => movePreset(index, -1)}
+                        disabled={index === 0 || presetBusy}
+                        className="flex h-5 w-6 items-center justify-center rounded text-fg-mute transition-colors hover:text-marine disabled:opacity-25"
+                      >
+                        <IconChevronUp size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`${preset.label}を下へ`}
+                        onClick={() => movePreset(index, 1)}
+                        disabled={index === presets.length - 1 || presetBusy}
+                        className="flex h-5 w-6 items-center justify-center rounded text-fg-mute transition-colors hover:text-marine disabled:opacity-25"
+                      >
+                        <IconChevronDown size={14} />
+                      </button>
+                    </div>
+                  ) : null}
                   <span className="min-w-0 flex-1 truncate text-[13px] text-fg-dim">
                     {preset.label}
                   </span>
@@ -316,40 +415,10 @@ export default function RulesClient({
               </div>
               {presetError ? <p className="text-[13px] text-danger">{presetError}</p> : null}
               <p className="text-[11px] text-fg-mute">
-                定型の追加・変更・削除は、この場ですぐ反映されます。
+                定型の追加・変更・削除・並び替えは、この場ですぐ反映されます。
               </p>
             </div>
           ) : null}
-        </Card>
-      </div>
-
-      <div>
-        <SectionLabel>フェーズ倍率</SectionLabel>
-        <Card>
-          <div className="divide-hairline">
-            {MULTIPLIERS.map((item) => (
-              <div key={item.key} className="flex items-center justify-between gap-4 py-2.5">
-                <label htmlFor={item.key} className="text-[13px] text-fg-dim">
-                  {item.label}
-                </label>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-fg-mute">×</span>
-                  <input
-                    id={item.key}
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    max={10}
-                    step={0.1}
-                    value={rules[item.key]}
-                    onChange={(e) => setMultiplier(item.key, e.target.value)}
-                    disabled={!canEdit}
-                className={numberInput}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
         </Card>
       </div>
 
