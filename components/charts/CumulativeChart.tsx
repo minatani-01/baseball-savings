@@ -39,35 +39,16 @@ function axisAmount(value: number, max: number): string {
 export default function CumulativeChart({
   points,
   height = 208,
-  caption,
-  emptyLabel = '記録が2件以上たまるとグラフが表示されます',
+  emptyLabel = '記録がたまるとグラフが表示されます',
 }: {
   points: ChartPoint[]
   height?: number
-  /** グラフの下に出す説明。何を積んだ線なのかを書く */
-  caption?: string
   emptyLabel?: string
 }) {
   if (points.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-line px-6 py-12 text-center text-sm text-fg-dim">
         {emptyLabel}
-      </div>
-    )
-  }
-
-  // 1点しかないときは線が引けない。データが無いわけではないので、
-  // 「ありません」ではなくその値を出す（推移はもう1点たまってから）
-  if (points.length === 1) {
-    return (
-      <div>
-        <div className="flex items-baseline justify-between gap-3 rounded-2xl border border-line px-4 py-5">
-          <span className="tnum text-[13px] text-fg-dim">{points[0].label}</span>
-          <span className="tnum text-2xl font-semibold text-marine">{yen(points[0].value)}</span>
-        </div>
-        <p className="mt-1.5 text-[11px] leading-relaxed text-fg-mute">
-          もう1つたまると推移のグラフになります。{caption ?? ''}
-        </p>
       </div>
     )
   }
@@ -85,7 +66,9 @@ export default function CumulativeChart({
   const step = niceStep(rawMax)
   const max = step * Math.max(1, Math.ceil(rawMax / step))
 
-  const x = (i: number) => padLeft + (innerW * i) / (points.length - 1)
+  // 点が1つのときは割り算ができないので、中央に置く（線は引かず丸だけ出す）
+  const x = (i: number) =>
+    points.length === 1 ? padLeft + innerW / 2 : padLeft + (innerW * i) / (points.length - 1)
   const y = (value: number) => padTop + innerH - (innerH * value) / max
   const baseY = padTop + innerH
 
@@ -147,17 +130,35 @@ export default function CumulativeChart({
           </g>
         ))}
 
-        <path d={area} fill="url(#mw-chart-fill)" />
-        <path
-          d={line}
-          fill="none"
-          stroke="#22d3ee"
-          strokeWidth="2"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          vectorEffect="non-scaling-stroke"
-        />
+        {points.length > 1 ? (
+          <>
+            <path d={area} fill="url(#mw-chart-fill)" />
+            <path
+              d={line}
+              fill="none"
+              stroke="#22d3ee"
+              strokeWidth="2"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          </>
+        ) : null}
         <circle cx={x(points.length - 1)} cy={y(last.value)} r="3.5" fill="#22d3ee" />
+
+        {/* 点が1つだけのときは線が無く、丸の高さだけでは額が読み取りにくいので値を添える */}
+        {points.length === 1 ? (
+          <text
+            x={x(0)}
+            y={y(last.value) - 8}
+            textAnchor="middle"
+            fontSize="10"
+            fill="#e6edf3"
+            className="tnum"
+          >
+            {yen(last.value)}
+          </text>
+        ) : null}
 
         {xTicks.map((index, i) => (
           <text
@@ -174,9 +175,6 @@ export default function CumulativeChart({
         ))}
       </svg>
 
-      {caption ? (
-        <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">{caption}</p>
-      ) : null}
     </div>
   )
 }
