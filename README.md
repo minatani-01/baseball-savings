@@ -71,6 +71,7 @@ Supabase の SQL Editor で番号順に実行します（何度実行しても�
 | `0010_member_avatar.sql` | メンバーの写真アイコン（`member-avatars` バケットと、自分のフォルダだけ読み書きできるRLS） |
 | `0011_profile_avatar.sql` | 自分のプロフィールアイコン（`profiles.avatar_path`） |
 | `0012_annual_goal.sql` | 目標金額を月間から年間へ（`monthly_goal_amount` → `annual_goal_amount`） |
+| `0013_master_auto_accept.sql` | マスター権限（`profiles.is_master`）。マスターからの接続リクエストは承認なしで接続する |
 
 ## デプロイ
 
@@ -153,6 +154,12 @@ master への push で Vercel が Production を自動デプロイします。�
 - **共同貯金は記録上の目標**（仕様書17章）。資金は各自のワンバンクのままで、
   達成率は確定済みの合計で見ます。相手の月次明細は読めず、`shared_goal_progress()` が
   メンバーごとの合計だけを返します。
+- **マスターからのリクエストは承認を待たない**。`profiles.is_master` が true の
+  アカウントが送った接続リクエストは、その場で接続済みになります。接続時に双方の
+  共有権限を作る既定（貯金と割り勘はON）はそのままなので、**相手が操作しなくても
+  相手の貯金と割り勘がマスターから見える状態で接続が始まります**。相手は接続後に
+  個別にOFFにでき、解除もどちらからでもできます。このフラグはアプリからは立てられません
+  （`guard_profile_is_master` が authenticated / anon からの書き換えを無視します）。
 - **共有は方向を持つ**（Marine Link）。仕様書 33章の `link_permissions` に `owner_id`
   を足し、「AがBに見せるもの」と「BがAに見せるもの」を別に持ちます。共有相手に開くのは
   SELECT だけで、書き換えの経路は作りません。判定は `marine_link_allows()` を通した

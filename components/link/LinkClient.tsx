@@ -37,6 +37,7 @@ import type {
 export default function LinkClient({
   userId,
   marineId,
+  isMaster,
   initialLinks,
   month,
   myMonthTotal,
@@ -45,6 +46,8 @@ export default function LinkClient({
 }: {
   userId: string
   marineId: string
+  /** マスター権限。自分が送ったリクエストは承認を待たずに接続される */
+  isMaster: boolean
   initialLinks: MarineLinkView[]
   month: string
   myMonthTotal: number
@@ -220,7 +223,17 @@ export default function LinkClient({
           </Field>
           {sent ? (
             <p className="mt-3 text-[13px] text-teal">
-              リクエストを送りました。相手が承認すると接続されます。
+              {isMaster
+                ? '接続しました。'
+                : 'リクエストを送りました。相手が承認すると接続されます。'}
+            </p>
+          ) : null}
+          {/* 相手の同意を挟まない動きなので、何が起きるかは明示しておく */}
+          {isMaster ? (
+            <p className="mt-2 text-[11px] leading-relaxed text-fg-mute">
+              マスター権限のため、あなたが送ったリクエストは承認を待たずに接続されます。
+              接続した時点で、相手の貯金と割り勘が既定で共有されます
+              （相手は接続後に個別にOFFにでき、接続の解除もできます）。
             </p>
           ) : null}
           <Button
