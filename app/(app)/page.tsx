@@ -137,6 +137,7 @@ export default async function HomePage() {
       <div className="flex flex-col gap-2">
         <Link
           href="/savings"
+          prefetch={false}
           className="flex min-h-[54px] items-center justify-between gap-3 rounded-2xl bg-marine px-4 font-semibold text-ink shadow-[0_0_40px_-16px_rgba(34,211,238,0.9)] transition-colors hover:bg-teal"
         >
           <span className="flex items-center gap-2.5">
@@ -147,6 +148,7 @@ export default async function HomePage() {
         </Link>
         <Link
           href="/split"
+          prefetch={false}
           className="glass flex min-h-[54px] items-center justify-between gap-3 rounded-2xl px-4 transition-colors hover:border-marine/50"
         >
           <span className="flex items-center gap-2.5 text-sm">
@@ -190,6 +192,7 @@ export default async function HomePage() {
           </div>
           <Link
             href="/savings"
+            prefetch={false}
             className="mt-4 inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl border border-marine/60 px-4 text-sm font-medium text-marine transition-colors hover:bg-marine/10"
           >
             月末の積立状況を見る
@@ -201,7 +204,11 @@ export default async function HomePage() {
       <div>
         <SectionLabel
           action={
-            <Link href="/history" className="text-[12px] text-fg-dim hover:text-marine">
+            <Link
+              href="/history"
+              prefetch={false}
+              className="text-[12px] text-fg-dim hover:text-marine"
+            >
               すべて見る
             </Link>
           }

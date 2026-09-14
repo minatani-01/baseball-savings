@@ -1,7 +1,15 @@
+import { cache } from 'react'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export async function createClient() {
+/**
+ * サーバー用 Supabase クライアント。
+ *
+ * React の cache() で包み、1リクエストの描画中は同じインスタンスを共有する。
+ * これがないと layout と page がそれぞれ別クライアントを作り、
+ * 認証のキャッシュもコネクションも共有できない。
+ */
+export const createClient = cache(async () => {
   const cookieStore = await cookies()
 
   return createServerClient(
@@ -22,4 +30,4 @@ export async function createClient() {
       },
     }
   )
-}
+})

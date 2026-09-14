@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { DEFAULT_SAVING_RULES } from '@/lib/savings'
 import type {
@@ -69,13 +70,26 @@ async function read<T>(table: string, run: () => PromiseLike<SupabaseResult<T>>)
   throw new QueryError(table, lastError?.message ?? 'unknown error', lastError?.code ?? '')
 }
 
-export async function getSessionUser() {
+export type SessionUser = { id: string; email: string }
+
+/**
+ * ログイン中のユーザー。layout と page の両方から呼ばれるので cache() で1回にまとめる。
+ *
+ * getUser() は毎回 Auth サーバーへ問い合わせる（実測 平均276ms）。
+ * このプロジェクトの JWT は ES256 署名なので getClaims() ならローカル検証で済み、
+ * JWKS を取得済みのインスタンスではネットワーク往復が発生しない。
+ * ここで必要なのは id と email だけで、いずれも JWT のクレームに含まれる。
+ */
+export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  return user
-}
+  const { data, error } = await supabase.auth.getClaims()
+  const claims = data?.claims
+  if (error || !claims?.sub) return null
+  return {
+    id: claims.sub,
+    email: typeof claims.email === 'string' ? claims.email : '',
+  }
+})
 
 export async function getProfile(userId: string): Promise<Profile | null> {
   const supabase = await createClient()
