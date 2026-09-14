@@ -368,12 +368,28 @@ export async function getMarineLinks(userId: string): Promise<MarineLinkView[]> 
  * 相手が貯金を共有していない場合、RLS で行が返らない。その状態を 0 円と
  * 区別できないと「相手は貯金していない」と誤読させるので、権限が無いことを
  * null で表す。
+ *
+ * 「ロッテ貯金を合算する」を切った相手は、そもそも一覧に出さない。
  */
 export async function getLinkMonthlyCompare(
   links: MarineLinkView[],
+  members: SplitMemberView[],
   month: string
 ): Promise<LinkMonthlyCompare[]> {
-  const connected = links.filter((l) => l.status === 'accepted')
+  // 「ロッテ貯金を合算する」を切った相手は、総累計だけでなく比較からも外す。
+  // 自分の集計に入れないと決めた人が、別の場所に出てくると分かりにくい。
+  // メンバー行が無い相手は合算する側に倒す（SQL の saving_circle_totals と同じ）。
+  const mergedIn = (link: MarineLinkView) => {
+    const member = members.find(
+      (m) =>
+        m.marine_id &&
+        link.partner_marine_id &&
+        m.marine_id.trim().toUpperCase() === link.partner_marine_id.trim().toUpperCase()
+    )
+    return member ? member.join_saving : true
+  }
+
+  const connected = links.filter((l) => l.status === 'accepted' && mergedIn(l))
   if (connected.length === 0) return []
 
   const visible = connected.filter((l) => l.received.saving)
