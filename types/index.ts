@@ -169,6 +169,12 @@ export type SplitMember = {
  */
 export type SplitMemberView = SplitMember & { avatar_url: string | null }
 
+/** 相手から共有されている積立の記録。誰のものかを表示するため所有者情報を添える */
+export type SharedSavingEntry = SavingEntryRow & {
+  owner_name: string
+  owner_marine_id: string
+}
+
 /** 相手から共有されている割り勘。誰のものかを表示するため所有者情報を添える */
 export type SharedSplitRecord = SplitRecord & {
   owner_name: string

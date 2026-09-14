@@ -7,18 +7,20 @@ import {
   getSavingRules,
   getSessionUser,
   getSharedGoals,
+  getSharedSavingEntries,
 } from '@/lib/queries'
 
 export default async function SavingsPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const [entries, monthlySavings, rules, goals, profile] = await Promise.all([
+  const [entries, monthlySavings, rules, goals, profile, shared] = await Promise.all([
     getSavingEntries(user.id),
     getMonthlySavings(user.id),
     getSavingRules(user.id),
     getSharedGoals(),
     getProfile(user.id),
+    getSharedSavingEntries(user.id),
   ])
 
   return (
@@ -29,6 +31,7 @@ export default async function SavingsPage() {
       rules={rules}
       goals={goals}
       isMaster={profile?.is_master ?? false}
+      shared={shared}
     />
   )
 }

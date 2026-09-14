@@ -40,7 +40,14 @@ import {
   pitchingHighlightLabel,
   resultLabel,
 } from '@/lib/constants'
-import type { MonthlySaving, MonthlyStatus, SavingEntryRow, SavingRules, SharedGoalView } from '@/types'
+import type {
+  MonthlySaving,
+  MonthlyStatus,
+  SavingEntryRow,
+  SavingRules,
+  SharedGoalView,
+  SharedSavingEntry,
+} from '@/types'
 
 const STATUS_TONE: Record<MonthlyStatus, 'neutral' | 'marine' | 'warn' | 'done'> = {
   calculating: 'neutral',
@@ -57,6 +64,7 @@ export default function SavingsClient({
   rules,
   goals,
   isMaster,
+  shared,
 }: {
   userId: string
   entries: SavingEntryRow[]
@@ -66,6 +74,8 @@ export default function SavingsClient({
   goals: SharedGoalView[]
   /** マスター権限。確定が共有先にも反映される */
   isMaster: boolean
+  /** 相手から共有されている積立の記録。閲覧のみで編集はできない */
+  shared: SharedSavingEntry[]
 }) {
   const router = useRouter()
   const [sheetMode, setSheetMode] = useState<SheetMode | null>(null)
@@ -77,10 +87,11 @@ export default function SavingsClient({
   const [monthError, setMonthError] = useState<string | null>(null)
 
   const months = useMemo(() => {
-    const set = new Set<string>(entries.map((e) => e.month))
+    // 共有分の月も候補に入れる。自分の記録が無い月でも相手の記録を見られるようにする
+    const set = new Set<string>([...entries, ...shared].map((e) => e.month))
     set.add(currentMonth())
     return [...set].sort((a, b) => b.localeCompare(a))
-  }, [entries])
+  }, [entries, shared])
 
   const [month, setMonth] = useState(() => months[0] ?? currentMonth())
 
@@ -103,6 +114,14 @@ export default function SavingsClient({
   const monthTotal = useMemo(
     () => monthEntries.reduce((sum, e) => sum + e.amount, 0),
     [monthEntries]
+  )
+
+  const monthShared = useMemo(
+    () =>
+      shared
+        .filter((e) => e.month === month)
+        .sort((a, b) => b.entry_date.localeCompare(a.entry_date)),
+    [shared, month]
   )
 
   // 目標は年単位。進捗は「その年の入金済みの月」の合計で見る。
@@ -444,7 +463,7 @@ export default function SavingsClient({
                             {resultLabel(g.result, g.is_sayonara)}
                             <span className="text-fg-mute"> vs </span>
                             {opponentLabel(g.opponent)}
-                            {g.marines_score !== null && g.opponent_score !== null ? (
+                            {g.marines_score != null && g.opponent_score != null ? (
                               <span className="tnum text-fg-mute">
                                 {' '}
                                 {g.marines_score}-{g.opponent_score}
@@ -488,6 +507,77 @@ export default function SavingsClient({
           </div>
         )}
       </div>
+
+      {/* 相手から共有されている記録。閲覧のみで、編集も削除もしない */}
+      {monthShared.length > 0 ? (
+        <div>
+          <SectionLabel>共有されている記録</SectionLabel>
+          <div className="flex flex-col gap-2">
+            {monthShared.map((entry) => {
+              const g = entry.game
+              const details = g
+                ? [
+                    g.home_runs > 0 ? `HR ${g.home_runs}` : null,
+                    g.grand_slams > 0 ? `満塁HR ${g.grand_slams}` : null,
+                    g.multi_hits > 0 ? `マルチ安打 ${g.multi_hits}` : null,
+                    g.rbi > 0 ? `打点 ${g.rbi}` : null,
+                    g.pitching_highlight !== 'none'
+                      ? pitchingHighlightLabel(g.pitching_highlight)
+                      : null,
+                    g.is_winning_pitcher ? '勝利投手' : null,
+                    g.has_save ? 'セーブ' : null,
+                  ].filter(Boolean)
+                : []
+
+              return (
+                <Card key={entry.id} className="!p-3.5">
+                  <div className="flex items-start gap-3">
+                    <IconFrame>{g ? <IconBaseball size={17} /> : <IconSpark size={17} />}</IconFrame>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 text-[11px] text-fg-mute">
+                        <span className="tnum">{shortDate(entry.entry_date)}</span>
+                        <span className="truncate">
+                          {entry.owner_name || entry.owner_marine_id || '相手'}
+                        </span>
+                        {g && g.phase !== 'regular' ? <span>{phaseLabel(g.phase)}</span> : null}
+                      </div>
+                      <div className="mt-1 truncate text-sm">
+                        {g ? (
+                          <>
+                            {resultLabel(g.result, g.is_sayonara)}
+                            <span className="text-fg-mute"> vs </span>
+                            {opponentLabel(g.opponent)}
+                            {g.marines_score != null && g.opponent_score != null ? (
+                              <span className="tnum text-fg-mute">
+                                {' '}
+                                {g.marines_score}-{g.opponent_score}
+                              </span>
+                            ) : null}
+                          </>
+                        ) : (
+                          entry.title
+                        )}
+                      </div>
+                      {details.length > 0 ? (
+                        <p className="mt-1 truncate text-[11px] text-fg-mute">
+                          {details.join(' / ')}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <Amount value={entry.amount} size="sm" tone="dim" />
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-fg-mute">
+            Marine Link で接続している相手の記録です。閲覧のみで、こちらからは変更できません。
+            上の合計には含めていません（金額は各自のものです）。
+          </p>
+        </div>
+      ) : null}
 
       {sheetMode === 'game' ? (
         <GameSheet entry={editing} rules={rules} userId={userId} onClose={closeSheet} />
