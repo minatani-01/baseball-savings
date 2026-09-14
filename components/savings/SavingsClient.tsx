@@ -581,7 +581,8 @@ export default function SavingsClient({
                   この月に {monthUnregistered.length} 試合ぶん、まだ積み立てていません。
                 </p>
                 <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
-                  試合データは全員共通です。あなたの貯金ルールで計算して積み立てます。
+                  試合データは全員共通です。共通の貯金ルールで計算して積み立てます。
+                  接続済みのアカウントには自動で立つので、ここに出るのは取りこぼしだけです。
                 </p>
               </div>
               <Amount value={unregisteredTotal} size="sm" tone="marine" />
