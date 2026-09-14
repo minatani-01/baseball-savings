@@ -145,3 +145,16 @@ export const LINK_RESOURCE_META: {
   { id: 'monthly', label: '月末入金状況', hint: '月末の確定額とワンバンク入金の進捗' },
   { id: 'split', label: '割り勘', hint: '立替の記録と精算状況' },
 ]
+
+/**
+ * メンバー写真の置き場所（0010のマイグレーションで作る非公開バケット）。
+ * パスは <ユーザーID>/<メンバーID>-<タイムスタンプ>.jpg で、
+ * 先頭フォルダが自分のIDと一致するオブジェクトだけ読み書きできる。
+ */
+export const MEMBER_AVATAR_BUCKET = 'member-avatars'
+
+/** 署名付きURLの有効期間（秒）。画面を開いたままでも当面切れない長さにする */
+export const MEMBER_AVATAR_TTL_SECONDS = 60 * 60
+
+/** アップロード時に変換する一辺の長さ（px）。等倍表示は最大40pxなので余裕がある */
+export const MEMBER_AVATAR_SIZE = 256

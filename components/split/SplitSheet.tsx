@@ -10,7 +10,7 @@ import { EXPENSE_CATEGORIES } from '@/lib/constants'
 import type {
   ExpenseCategory,
   Share,
-  SplitMember,
+  SplitMemberView,
   SplitRecord,
   SplitStatus,
   SplitType,
@@ -29,7 +29,7 @@ export default function SplitSheet({
   onClose,
 }: {
   record: SplitRecord | null
-  members: SplitMember[]
+  members: SplitMemberView[]
   userId: string
   onClose: () => void
 }) {
@@ -248,7 +248,7 @@ export default function SplitSheet({
                         : 'border-line bg-white/[0.02] text-fg-mute'
                     }`}
                   >
-                    <Avatar name={m.name} selected={on} size={24} />
+                    <Avatar name={m.name} src={m.avatar_url} selected={on} size={24} />
                     <span className="truncate">{m.name}</span>
                   </button>
                 )

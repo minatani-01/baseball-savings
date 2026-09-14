@@ -67,6 +67,9 @@ Supabase の SQL Editor で番号順に実行します（何度実行しても�
 | `0006_shared_goals.sql` | 共同貯金（`shared_goals` / `shared_goal_members` / 進捗RPC） |
 | `0007_split_member_marine_id.sql` | メンバーの Marine ID と、参加者単位の割り勘共有 |
 | `0008_member_participation.sql` | メンバーの参加機能（割り勘 / 貯金）と、貯金の参加者別集計RPC |
+| `0009_drop_deposit_pending.sql` | 月末フローから「入金手続き中」を外す |
+| `0010_member_avatar.sql` | メンバーの写真アイコン（`member-avatars` バケットと、自分のフォルダだけ読み書きできるRLS） |
+| `0011_profile_avatar.sql` | 自分のプロフィールアイコン（`profiles.avatar_path`） |
 
 ## デプロイ
 
@@ -87,8 +90,8 @@ master への push で Vercel が Production を自動デプロイします。�
 貯金          試合登録・カスタム貯金 / 月間集計と目標進捗 / 月末確定・ワンバンク入金 / 貯金ルール
 割り勘        未精算サマリーと支払い状況 / メンバー / 精算（PayPay誘導）/ 未精算・すべて・完了
 履歴          貯金推移 / 取引履歴 / 月別 / 年別
-マイページ    Marine ID / 表示名・ログアウト / お知らせ / メンバー / Marine Link
-  ├ メンバー      一緒に使う人 / Marine ID / 割り勘・貯金への参加
+マイページ    Marine ID / アイコン・表示名・ログアウト / お知らせ / メンバー / Marine Link
+  ├ メンバー      一緒に使う人 / 写真アイコン / Marine ID / 割り勘・貯金への参加
   └ Marine Link   接続リクエストと承認 / 接続ごとの共有権限 / 共同貯金 / 月間比較
 ```
 
@@ -118,6 +121,15 @@ master への push で Vercel が Production を自動デプロイします。�
 - **ワンバンク入金は月末に1回**。`monthly_savings` が
   `calculating → ready → deposited` の状態を管理します。
   入金はワンバンク側で一度に終わるため、間に「手続き中」は挟みません。
+- **メンバー管理はマイページの下に置く**。下部ナビは URL の前方一致で点灯するため、
+  `/split/members` に置くと操作中ずっと「割り勘」が点いたままになる。マイページからの
+  導線なので `/me/members` に移し、古いURLは転送だけ残してある。
+- **アイコンの写真は非公開に置く**。`member-avatars` バケットは public=false で、
+  `<ユーザーID>/…` の先頭フォルダが自分と一致するオブジェクトだけ読み書きできる
+  （本番DBで、別アカウントからも未ログインからも見えないことを確認済み）。
+  表示のたびにサーバー側で署名付きURLを発行する。アップロード時は端末側で中央を
+  正方形に切り出して 256px の JPEG に変換してから上げるため、元の写真の大きさは問わない。
+  署名が切れたり読めなかったときは名前の頭文字表示に戻す。
 - **UIに絵文字は使わない**（仕様書 4.1）。アイコンはすべて `components/icons.tsx` の SVG ラインアイコンです。
 - **累計貯金額は確定した月だけを数える**。月末に「確定」した `monthly_savings.confirmed_amount`
   の合計で、今月のように未確定の月は含めません（未確定分は見込みとして別に扱います）。

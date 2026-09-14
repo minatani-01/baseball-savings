@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { IconCheck, IconClose } from '@/components/icons'
 import { yen } from '@/lib/format'
@@ -360,27 +361,52 @@ export function ProgressBar({
 }
 
 // ------------------------------------------------------------- Avatar ----
+/**
+ * メンバーのアイコン。
+ * src（署名付きURL）があれば写真、無ければ名前の頭文字を出す。
+ * 署名付きURLは有効期限があるため、期限切れや読み込み失敗は onError で
+ * 頭文字表示へ落とす。ここが崩れても情報は失われない。
+ *
+ * next/image を使わないのは、URL が毎回変わる署名付きで最適化キャッシュが効かず、
+ * 40px の画像に最適化の往復を挟む意味が無いため。
+ */
 export function Avatar({
   name,
+  src = null,
   selected = false,
   size = 40,
 }: {
   name: string
+  src?: string | null
   selected?: boolean
   size?: number
 }) {
+  const [failed, setFailed] = useState(false)
   const initial = name.trim().slice(0, 1) || '?'
+  const showPhoto = Boolean(src) && !failed
+
   return (
     <span
       aria-hidden="true"
       style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}
-      className={`inline-flex shrink-0 items-center justify-center rounded-full border font-semibold ${
+      className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border font-semibold ${
         selected
           ? 'border-marine/70 bg-marine/15 text-marine'
           : 'border-line bg-white/[0.03] text-fg-dim'
       }`}
     >
-      {initial}
+      {showPhoto ? (
+        <img
+          src={src!}
+          alt=""
+          width={size}
+          height={size}
+          onError={() => setFailed(true)}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        initial
+      )}
     </span>
   )
 }

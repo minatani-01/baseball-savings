@@ -24,7 +24,14 @@ import { createClient } from '@/lib/supabase/client'
 import { distributeEqual, simplifyDebts } from '@/lib/warikan'
 import { shortDate, yen } from '@/lib/format'
 import { categoryLabel } from '@/lib/constants'
-import type { Share, SharedSplitRecord, SortOrder, SplitFilter, SplitMember, SplitRecord } from '@/types'
+import type {
+  Share,
+  SharedSplitRecord,
+  SortOrder,
+  SplitFilter,
+  SplitMemberView,
+  SplitRecord,
+} from '@/types'
 
 function sharesOf(record: SplitRecord, fallbackNames: string[]): Share[] {
   if (record.shares && record.shares.length > 0) return record.shares
@@ -41,7 +48,7 @@ export default function SplitClient({
 }: {
   userId: string
   records: SplitRecord[]
-  members: SplitMember[]
+  members: SplitMemberView[]
   /** 相手から共有されている割り勘。閲覧のみで編集はできない */
   shared: SharedSplitRecord[]
 }) {
@@ -53,6 +60,14 @@ export default function SplitClient({
   const [busy, setBusy] = useState(false)
 
   const memberNames = useMemo(() => members.map((m) => m.name), [members])
+  // 精算や明細では名前しか手元に無いので、名前から写真を引けるようにしておく
+  const avatarOf = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const m of members) {
+      if (m.avatar_url) map.set(m.name, m.avatar_url)
+    }
+    return (name: string) => map.get(name) ?? null
+  }, [members])
   const unpaid = useMemo(() => records.filter((r) => r.status === 'unpaid'), [records])
   const paid = useMemo(() => records.filter((r) => r.status === 'paid'), [records])
 
@@ -164,7 +179,7 @@ export default function SplitClient({
         <SectionLabel
           action={
             <Link
-              href="/split/members"
+              href="/me/members"
               prefetch={false}
               className="inline-flex items-center gap-1 text-[12px] text-fg-dim hover:text-marine"
             >
@@ -184,7 +199,7 @@ export default function SplitClient({
             <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
               {members.map((m) => (
                 <div key={m.id} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
-                  <Avatar name={m.name} selected={m.is_self} />
+                  <Avatar name={m.name} src={m.avatar_url} selected={m.is_self} />
                   <span className="w-full truncate text-center text-[11px] text-fg-dim">
                     {m.is_self ? 'あなた' : m.name}
                   </span>
@@ -194,7 +209,7 @@ export default function SplitClient({
                 </div>
               ))}
               <Link
-                href="/split/members"
+                href="/me/members"
                 prefetch={false}
                 aria-label="メンバーを追加"
                 className="flex w-16 shrink-0 flex-col items-center gap-1.5"
@@ -222,10 +237,10 @@ export default function SplitClient({
               <Card key={`${t.from}-${t.to}-${t.amount}`}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-2 text-sm">
-                    <Avatar name={t.from} size={26} />
+                    <Avatar name={t.from} src={avatarOf(t.from)} size={26} />
                     <span className="truncate">{t.from}</span>
                     <span className="text-fg-mute">→</span>
-                    <Avatar name={t.to} size={26} />
+                    <Avatar name={t.to} src={avatarOf(t.to)} size={26} />
                     <span className="truncate">{t.to}</span>
                   </div>
                   <Amount value={t.amount} size="md" tone="marine" />
@@ -319,7 +334,7 @@ export default function SplitClient({
                     {sharesOf(record, memberNames)
                       .slice(0, 4)
                       .map((s) => (
-                        <Avatar key={s.member} name={s.member} size={22} />
+                        <Avatar key={s.member} name={s.member} src={avatarOf(s.member)} size={22} />
                       ))}
                     {record.member_count > 4 ? (
                       <span className="text-[11px] text-fg-mute">+{record.member_count - 4}</span>

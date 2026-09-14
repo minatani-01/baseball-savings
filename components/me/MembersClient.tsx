@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  Avatar,
   Button,
   Card,
   Checkbox,
@@ -12,16 +11,18 @@ import {
   SectionLabel,
   inputClass,
 } from '@/components/ui'
+import AvatarPicker from '@/components/AvatarPicker'
 import { IconCheck, IconLink, IconPlus, IconTrash } from '@/components/icons'
 import { createClient } from '@/lib/supabase/client'
-import type { SplitMember } from '@/types'
+import { rejectReason, removeAvatarFile, uploadAvatar } from '@/lib/avatar'
+import type { SplitMemberView } from '@/types'
 
 export default function MembersClient({
   userId,
   members,
 }: {
   userId: string
-  members: SplitMember[]
+  members: SplitMemberView[]
 }) {
   const router = useRouter()
   const [newName, setNewName] = useState('')
@@ -30,10 +31,16 @@ export default function MembersClient({
   // 編集中の Marine ID（メンバーID -> 入力値）。保存するまでDBには書かない
   const [draftIds, setDraftIds] = useState<Record<string, string>>({})
   const [savedId, setSavedId] = useState<string | null>(null)
+  // 写真をアップロード中のメンバーID
+  const [uploading, setUploading] = useState<string | null>(null)
 
-  const draftOf = (member: SplitMember) => draftIds[member.id] ?? member.marine_id ?? ''
+  const draftOf = (member: SplitMemberView) => draftIds[member.id] ?? member.marine_id ?? ''
 
-  const setJoin = async (member: SplitMember, field: 'join_split' | 'join_saving', next: boolean) => {
+  const setJoin = async (
+    member: SplitMemberView,
+    field: 'join_split' | 'join_saving',
+    next: boolean
+  ) => {
     setBusy(true)
     setError(null)
     const supabase = createClient()
@@ -49,7 +56,7 @@ export default function MembersClient({
     router.refresh()
   }
 
-  const saveMarineId = async (member: SplitMember) => {
+  const saveMarineId = async (member: SplitMemberView) => {
     const raw = draftOf(member).trim().toUpperCase()
     // 空欄は「登録しない」。書式が違うものは DB の CHECK に弾かれる前にここで止める
     if (raw !== '' && !/^MW-[0-9A-Z]{6}$/.test(raw)) {
@@ -70,6 +77,65 @@ export default function MembersClient({
     }
     setSavedId(member.id)
     setTimeout(() => setSavedId((prev) => (prev === member.id ? null : prev)), 1800)
+    router.refresh()
+  }
+
+  /**
+   * 写真を差し替える。
+   *
+   * 先に新しいファイルを上げてから split_members を書き換え、最後に古いファイルを消す。
+   * この順なら途中で失敗しても、表示中の写真が消えた状態にはならない。
+   */
+  const uploadPhoto = async (member: SplitMemberView, file: File) => {
+    const reason = rejectReason(file)
+    if (reason) {
+      setError(reason)
+      return
+    }
+
+    setUploading(member.id)
+    setBusy(true)
+    setError(null)
+    const supabase = createClient()
+    try {
+      const path = await uploadAvatar(supabase, userId, member.id, file)
+
+      const { error: updateError } = await supabase
+        .from('split_members')
+        .update({ avatar_path: path })
+        .eq('id', member.id)
+      if (updateError) {
+        // 参照されないファイルを残さない
+        await removeAvatarFile(supabase, path)
+        throw new Error('写真の保存に失敗しました')
+      }
+
+      await removeAvatarFile(supabase, member.avatar_path)
+      router.refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '写真の保存に失敗しました')
+    } finally {
+      setUploading(null)
+      setBusy(false)
+    }
+  }
+
+  const removePhoto = async (member: SplitMemberView) => {
+    if (!member.avatar_path) return
+    setBusy(true)
+    setError(null)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('split_members')
+      .update({ avatar_path: null })
+      .eq('id', member.id)
+    if (error) {
+      setBusy(false)
+      setError('写真の削除に失敗しました')
+      return
+    }
+    await removeAvatarFile(supabase, member.avatar_path)
+    setBusy(false)
     router.refresh()
   }
 
@@ -97,7 +163,7 @@ export default function MembersClient({
     router.refresh()
   }
 
-  const markSelf = async (member: SplitMember) => {
+  const markSelf = async (member: SplitMemberView) => {
     setBusy(true)
     const supabase = createClient()
     // 「あなた」は1人だけ。まず全員を解除してから対象だけ立てる
@@ -109,7 +175,7 @@ export default function MembersClient({
     router.refresh()
   }
 
-  const remove = async (member: SplitMember) => {
+  const remove = async (member: SplitMemberView) => {
     if (
       !window.confirm(
         `${member.name} を削除しますか？\n過去の記録に保存された名前と金額はそのまま残ります。`
@@ -120,22 +186,13 @@ export default function MembersClient({
     setBusy(true)
     const supabase = createClient()
     await supabase.from('split_members').delete().eq('id', member.id)
+    await removeAvatarFile(supabase, member.avatar_path)
     setBusy(false)
     router.refresh()
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="text-[13px] leading-relaxed text-fg-mute">
-        Marine Wallet を一緒に使う人をここで管理します。人数の上限はありません。
-        名前を変更・削除しても、過去の記録に保存された名前と負担額は変わりません。
-        {'\n'}
-        相手が Marine Wallet を使っているなら Marine ID を登録し、参加する機能を選んでください。
-        割り勘は、Marine Link で接続済みかつ Marine ID が一致するメンバーが参加している記録だけが
-        相手から見えます（参加していない記録は見えません。相手が書き換えることもできません）。
-        貯金は、参加しているメンバーの確定済みの積立額が総累計貯金額に合算されます。
-      </p>
-
       <div>
         <SectionLabel>Members</SectionLabel>
         {members.length === 0 ? (
@@ -145,13 +202,25 @@ export default function MembersClient({
             {members.map((member) => (
               <Card key={member.id} className="!p-3">
                 <div className="flex items-center gap-3">
-                  <Avatar name={member.name} selected={member.is_self} />
+                  {/* 写真の差し替え。アイコンごとタップで端末の画像選択が開く */}
+                  <AvatarPicker
+                    name={member.name}
+                    src={member.avatar_url}
+                    hasPhoto={Boolean(member.avatar_path)}
+                    selected={member.is_self}
+                    disabled={busy}
+                    onFile={(file) => uploadPhoto(member, file)}
+                  />
+
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm">{member.name}</div>
-                    {member.is_self ? (
+                    {uploading === member.id ? (
+                      <div className="text-[11px] text-fg-mute">写真を保存しています</div>
+                    ) : member.is_self ? (
                       <div className="text-[11px] text-marine">あなた</div>
                     ) : null}
                   </div>
+
                   <IconButton
                     label={member.is_self ? '「あなた」を解除' : '「あなた」に設定'}
                     onClick={() => markSelf(member)}
@@ -218,6 +287,16 @@ export default function MembersClient({
                       disabled={busy}
                       label="貯金"
                     />
+                    {member.avatar_path ? (
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(member)}
+                        disabled={busy}
+                        className="ml-auto shrink-0 text-[11px] text-fg-mute transition-colors hover:text-danger disabled:opacity-40"
+                      >
+                        写真を削除
+                      </button>
+                    ) : null}
                   </div>
 
                   {member.join_saving && !member.is_self && !member.marine_id ? (
@@ -255,6 +334,26 @@ export default function MembersClient({
             </Button>
           </div>
           {error ? <p className="mt-2 text-[13px] text-danger">{error}</p> : null}
+        </Card>
+      </div>
+
+      <div>
+        <SectionLabel>この画面について</SectionLabel>
+        <Card>
+          <p className="text-[13px] leading-relaxed text-fg-mute">
+            Marine Wallet を一緒に使う人をここで管理します。人数の上限はありません。
+            名前を変更・削除しても、過去の記録に保存された名前と負担額は変わりません。
+          </p>
+          <p className="mt-2.5 text-[13px] leading-relaxed text-fg-mute">
+            アイコンをタップすると写真を設定できます。正方形に切り出して縮めてから保存し、
+            写真は自分だけが見られる場所に置きます。設定していない人は名前の頭文字を表示します。
+          </p>
+          <p className="mt-2.5 text-[13px] leading-relaxed text-fg-mute">
+            相手が Marine Wallet を使っているなら Marine ID を登録し、参加する機能を選んでください。
+            割り勘は、Marine Link で接続済みかつ Marine ID が一致するメンバーが参加している記録だけが
+            相手から見えます（参加していない記録は見えません。相手が書き換えることもできません）。
+            貯金は、参加しているメンバーの確定済みの積立額が総累計貯金額に合算されます。
+          </p>
         </Card>
       </div>
     </div>

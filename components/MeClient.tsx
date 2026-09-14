@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button, Card, Field, Row, SectionLabel, inputClass } from '@/components/ui'
+import AvatarPicker from '@/components/AvatarPicker'
 import {
   IconBell,
   IconCheck,
@@ -14,16 +15,20 @@ import {
   IconUsers,
 } from '@/components/icons'
 import { createClient } from '@/lib/supabase/client'
+import { rejectReason, removeAvatarFile, uploadAvatar } from '@/lib/avatar'
 import type { Profile } from '@/types'
 
 export default function MeClient({
   userId,
   email,
   initialProfile,
+  avatarUrl,
 }: {
   userId: string
   email: string
   initialProfile: Profile | null
+  /** プロフィールアイコンの署名付きURL。未設定・発行失敗のときは null */
+  avatarUrl: string | null
 }) {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(initialProfile)
@@ -31,6 +36,9 @@ export default function MeClient({
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileSaved, setProfileSaved] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  // アイコンのエラーはアイコンの近くに出す。画面末尾だと操作した場所から遠くて気付けない
+  const [avatarError, setAvatarError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // Marine ID はプロフィール行の作成時に採番される。未作成なら初回訪問時に作る。
@@ -76,6 +84,66 @@ export default function MeClient({
     router.refresh()
   }
 
+  /**
+   * プロフィールアイコンを差し替える。
+   *
+   * 先に新しいファイルを上げてから profiles を書き換え、最後に古いファイルを消す。
+   * この順なら途中で失敗しても、表示中のアイコンが消えた状態にはならない。
+   */
+  const uploadAvatarPhoto = async (file: File) => {
+    if (!profile) return
+    const reason = rejectReason(file)
+    if (reason) {
+      setAvatarError(reason)
+      return
+    }
+
+    setUploadingAvatar(true)
+    setAvatarError(null)
+    const supabase = createClient()
+    try {
+      const path = await uploadAvatar(supabase, userId, 'profile', file)
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_path: path })
+        .eq('id', userId)
+      if (updateError) {
+        // 参照されないファイルを残さない
+        await removeAvatarFile(supabase, path)
+        throw new Error('アイコンの保存に失敗しました')
+      }
+
+      await removeAvatarFile(supabase, profile.avatar_path)
+      setProfile({ ...profile, avatar_path: path })
+      router.refresh()
+    } catch (e) {
+      setAvatarError(e instanceof Error ? e.message : 'アイコンの保存に失敗しました')
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
+
+  const removeAvatarPhoto = async () => {
+    if (!profile?.avatar_path) return
+    setUploadingAvatar(true)
+    setAvatarError(null)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('profiles')
+      .update({ avatar_path: null })
+      .eq('id', userId)
+    if (error) {
+      setUploadingAvatar(false)
+      setAvatarError('アイコンの削除に失敗しました')
+      return
+    }
+    await removeAvatarFile(supabase, profile.avatar_path)
+    setProfile({ ...profile, avatar_path: null })
+    setUploadingAvatar(false)
+    router.refresh()
+  }
+
   const copyMarineId = async () => {
     if (!profile) return
     try {
@@ -117,7 +185,44 @@ export default function MeClient({
       <div>
         <SectionLabel>Account</SectionLabel>
         <Card>
-          <div className="divide-hairline">
+          {/* アイコンと表示名。アイコンをタップすると端末の画像選択が開く */}
+          <div className="flex items-center gap-3 pb-4">
+            <AvatarPicker
+              name={displayName || email}
+              src={avatarUrl}
+              hasPhoto={Boolean(profile?.avatar_path)}
+              selected
+              size={56}
+              disabled={!profile || uploadingAvatar}
+              onFile={uploadAvatarPhoto}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm">{displayName || '表示名が未設定です'}</div>
+              <div className="mt-1 text-[11px] text-fg-mute">
+                {uploadingAvatar
+                  ? 'アイコンを保存しています'
+                  : profile?.avatar_path
+                    ? 'アイコンをタップすると変更できます'
+                    : 'アイコンをタップすると写真を設定できます'}
+              </div>
+            </div>
+            {profile?.avatar_path ? (
+              <button
+                type="button"
+                onClick={removeAvatarPhoto}
+                disabled={uploadingAvatar}
+                className="shrink-0 text-[11px] text-fg-mute transition-colors hover:text-danger disabled:opacity-40"
+              >
+                削除
+              </button>
+            ) : null}
+          </div>
+
+          {avatarError ? (
+            <p className="-mt-2 pb-4 text-[13px] text-danger">{avatarError}</p>
+          ) : null}
+
+          <div className="divide-hairline border-t border-line pt-4">
             <Row label="メールアドレス" value={email} />
           </div>
           <div className="mt-4 border-t border-line pt-4">
@@ -171,7 +276,7 @@ export default function MeClient({
       <div>
         <SectionLabel>メンバー</SectionLabel>
         <Link
-          href="/split/members"
+          href="/me/members"
           prefetch={false}
           className="glass flex items-center gap-3 rounded-2xl p-4 transition-colors hover:border-marine/50"
         >

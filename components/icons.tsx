@@ -392,3 +392,12 @@ export function IconRefresh(props: IconProps) {
     </Icon>
   )
 }
+
+export function IconCamera(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 8.8A1.8 1.8 0 0 1 4.8 7h2.1l1.3-2.1h7.6L17.1 7h2.1A1.8 1.8 0 0 1 21 8.8v8.4A1.8 1.8 0 0 1 19.2 19H4.8A1.8 1.8 0 0 1 3 17.2Z" />
+      <circle cx="12" cy="13" r="3.4" />
+    </Icon>
+  )
+}
