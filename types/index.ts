@@ -133,8 +133,23 @@ export type SplitMember = {
   name: string
   is_self: boolean
   sort_order: number
+  /**
+   * このメンバーの Marine ID。登録すると、接続済みのそのアカウントから
+   * このメンバーが参加している割り勘だけが見えるようになる（0007のRLS）。
+   */
+  marine_id: string | null
+  /** 割り勘に参加するか */
+  join_split: boolean
+  /** 貯金に参加するか（総累計貯金額の集計対象になる） */
+  join_saving: boolean
   created_at: string
   updated_at: string
+}
+
+/** 相手から共有されている割り勘。誰のものかを表示するため所有者情報を添える */
+export type SharedSplitRecord = SplitRecord & {
+  owner_name: string
+  owner_marine_id: string
 }
 
 export type Share = {
@@ -217,4 +232,54 @@ export type LinkMonthlyCompare = {
   partner_name: string
   /** 相手が貯金を共有していないときは null */
   partner_amount: number | null
+}
+
+/**
+ * 貯金の参加者ごとの累計（0008 の saving_circle_totals）。
+ *
+ * confirmed は「月末に確定した月次金額」の合計で、今月など未確定の月は含まない。
+ * pending は未確定の月の見込みで、累計には足さない。
+ * 相手が貯金を共有していない場合は is_visible=false になり、0円と区別できる。
+ */
+export type SavingCircleTotal = {
+  member_name: string
+  marine_id: string
+  is_self: boolean
+  is_visible: boolean
+  confirmed: number
+  pending: number
+}
+
+// ------------------------------------------------- 共同貯金（仕様書17章） ----
+export type SharedGoalRow = {
+  id: string
+  marine_link_id: string
+  title: string
+  target_amount: number
+  /** 'YYYY-MM'。null は期間の制限なし */
+  start_month: string | null
+  end_month: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * 共同目標のメンバーごとの進捗。
+ * confirmed は月末に確定した月次金額の合計で、未確定の月は pending に入る。
+ */
+export type SharedGoalMemberProgress = {
+  user_id: string
+  display_name: string
+  marine_id: string
+  confirmed: number
+  pending: number
+}
+
+export type SharedGoalView = SharedGoalRow & {
+  progress: SharedGoalMemberProgress[]
+  /** 確定済みの合計。達成率はこの値で見る */
+  confirmed_total: number
+  /** 未確定の見込み合計。達成率には入れない */
+  pending_total: number
 }

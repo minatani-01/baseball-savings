@@ -11,6 +11,7 @@ import {
   IconCopy,
   IconLink,
   IconLogout,
+  IconUsers,
 } from '@/components/icons'
 import { loadAppLinks, saveAppLinks, type AppLinks } from '@/components/HandoffActions'
 import { createClient } from '@/lib/supabase/client'
@@ -213,6 +214,24 @@ export default function MeClient({
             </div>
           </div>
         </Card>
+      </div>
+
+      <div>
+        <SectionLabel>メンバー</SectionLabel>
+        <Link
+          href="/split/members"
+          prefetch={false}
+          className="glass flex items-center gap-3 rounded-2xl p-4 transition-colors hover:border-marine/50"
+        >
+          <IconUsers size={18} className="shrink-0 text-fg-mute" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px]">一緒に使う人</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
+              Marine ID の登録と、割り勘・貯金それぞれへの参加を設定します。
+            </p>
+          </div>
+          <IconChevronRight size={18} className="shrink-0 text-fg-mute" />
+        </Link>
       </div>
 
       <div>

@@ -1,5 +1,5 @@
 import { currentMonth, toMonth, today } from '@/lib/format'
-import type { SavingEntryRow } from '@/types'
+import type { MonthlySaving, SavingEntryRow } from '@/types'
 
 /** 'YYYY-MM' の N か月前を返す */
 export function shiftMonth(month: string, delta: number): string {
@@ -76,4 +76,45 @@ export function sumByYear(entries: SavingEntryRow[]): { year: string; amount: nu
 /** 支出日付から 'YYYY-MM' を得る（割り勘レコード用） */
 export function recordMonth(date: string): string {
   return toMonth(date)
+}
+
+/**
+ * 「累計貯金額」の定義（アプリ全体で唯一の定義）。
+ *
+ * 月末に「確定」した月だけを数える。今月のようにまだ確定していない月は含めない。
+ * 画面ごとに entries を素朴に合計すると、確定前の今月分が混ざって数字がずれるため、
+ * 累計を出すところは必ずこの関数を通す。
+ */
+export function confirmedMonthSet(monthlySavings: MonthlySaving[]): Set<string> {
+  return new Set(
+    monthlySavings
+      .filter(
+        (m) =>
+          m.confirmed_amount !== null &&
+          (m.status === 'ready' || m.status === 'deposit_pending' || m.status === 'deposited')
+      )
+      .map((m) => m.month)
+  )
+}
+
+/** 確定した月だけの積立合計 */
+export function confirmedTotal(monthlySavings: MonthlySaving[]): number {
+  return monthlySavings
+    .filter(
+      (m) =>
+        m.confirmed_amount !== null &&
+        (m.status === 'ready' || m.status === 'deposit_pending' || m.status === 'deposited')
+    )
+    .reduce((sum, m) => sum + (m.confirmed_amount ?? 0), 0)
+}
+
+/** まだ確定していない月の積立合計（見込み。累計には足さない） */
+export function pendingTotal(
+  entries: { month: string; amount: number }[],
+  monthlySavings: MonthlySaving[]
+): number {
+  const confirmed = confirmedMonthSet(monthlySavings)
+  return entries
+    .filter((e) => !confirmed.has(e.month))
+    .reduce((sum, e) => sum + e.amount, 0)
 }

@@ -24,7 +24,7 @@ import { createClient } from '@/lib/supabase/client'
 import { distributeEqual, simplifyDebts } from '@/lib/warikan'
 import { shortDate, yen } from '@/lib/format'
 import { categoryLabel } from '@/lib/constants'
-import type { Share, SortOrder, SplitFilter, SplitMember, SplitRecord } from '@/types'
+import type { Share, SharedSplitRecord, SortOrder, SplitFilter, SplitMember, SplitRecord } from '@/types'
 
 function sharesOf(record: SplitRecord, fallbackNames: string[]): Share[] {
   if (record.shares && record.shares.length > 0) return record.shares
@@ -37,10 +37,13 @@ export default function SplitClient({
   userId,
   records,
   members,
+  shared,
 }: {
   userId: string
   records: SplitRecord[]
   members: SplitMember[]
+  /** 相手から共有されている割り勘。閲覧のみで編集はできない */
+  shared: SharedSplitRecord[]
 }) {
   const router = useRouter()
   const [filter, setFilter] = useState<SplitFilter>('unpaid')
@@ -359,6 +362,40 @@ export default function SplitClient({
           </div>
         )}
       </div>
+
+      {/* 相手から共有されている割り勘（Marine ID をメンバーに登録してもらうと届く） */}
+      {shared.length > 0 ? (
+        <div>
+          <SectionLabel>共有されている割り勘</SectionLabel>
+          <p className="mb-2.5 text-[11px] leading-relaxed text-fg-mute">
+            あなたの Marine ID がメンバーとして登録されている割り勘です。閲覧のみで、
+            編集や精算は記録した本人が行います。
+          </p>
+          <div className="flex flex-col gap-2">
+            {shared.map((record) => (
+              <Card key={record.id} className="!p-3">
+                <div className="flex items-center gap-3">
+                  <CategoryIcon category={record.category} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm">{record.content}</div>
+                    <div className="text-[11px] text-fg-mute">
+                      {shortDate(record.date)} / {record.owner_name || record.owner_marine_id} の記録
+                      {' / '}
+                      {record.payer} が立替
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="tnum text-sm font-semibold">{yen(record.amount)}</div>
+                    <div className="mt-0.5 text-[10px] tracking-wider text-fg-mute">
+                      {record.status === 'unpaid' ? '未精算' : '完了'}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {sheetOpen ? (
         <SplitSheet

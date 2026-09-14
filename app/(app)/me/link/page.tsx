@@ -5,6 +5,7 @@ import {
   getMarineLinks,
   getMonthSavingTotal,
   getProfile,
+  getSharedGoals,
   getSessionUser,
 } from '@/lib/queries'
 import { currentMonth } from '@/lib/format'
@@ -16,9 +17,10 @@ export default async function MarineLinkPage() {
   const month = currentMonth()
   const [profile, links] = await Promise.all([getProfile(user.id), getMarineLinks(user.id)])
   // 月間比較は接続相手が確定してからでないと引けないので、links の後に取る
-  const [compare, myMonthTotal] = await Promise.all([
+  const [compare, myMonthTotal, goals] = await Promise.all([
     getLinkMonthlyCompare(links, month),
     getMonthSavingTotal(user.id, month),
+    getSharedGoals(),
   ])
 
   return (
@@ -29,6 +31,7 @@ export default async function MarineLinkPage() {
       month={month}
       myMonthTotal={myMonthTotal}
       compare={compare}
+      goals={goals}
     />
   )
 }

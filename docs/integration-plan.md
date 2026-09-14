@@ -66,7 +66,7 @@
 | --- | --- |
 | リポジトリ | `minatani-01/marine-wallet`（旧 `baseball-savings` を改称。旧URLはGitHubがリダイレクトする） |
 | 公開URL | marine-wallet.vercel.app（旧 baseball-savings.vercel.app は削除済み） |
-| Vercelプロジェクト名 | `baseball-savings` のまま（プロジェクト名の変更はデプロイに影響しないため据え置き） |
+| Vercelプロジェクト名 | `marine-wallet`（旧 `baseball-savings` を改称。Preview URL も `marine-wallet-git-...` になった） |
 | Supabase | Marine Wallet / `xliszlnpypvqghrwplxa` |
 | 旧リソース | `warikan-app` リポジトリ・Vercelプロジェクト、旧貯金Supabaseプロジェクトはいずれも削除／PAUSED 済み |
 

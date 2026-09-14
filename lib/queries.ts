@@ -13,6 +13,11 @@ import type {
   Profile,
   SavingEntryRow,
   SavingRules,
+  SavingCircleTotal,
+  SharedGoalMemberProgress,
+  SharedGoalRow,
+  SharedGoalView,
+  SharedSplitRecord,
   SplitMember,
   SplitRecord,
 } from '@/types'
@@ -299,4 +304,93 @@ export async function getMonthSavingTotal(userId: string, month: string): Promis
     supabase.from('saving_entries').select('amount').eq('user_id', userId).eq('month', month)
   )
   return (rows ?? []).reduce((sum, row) => sum + row.amount, 0)
+}
+
+/**
+ * 相手から共有されている割り勘（0007）。
+ *
+ * 見えるのは「自分の Marine ID が登録されたメンバーとして参加している割り勘」だけで、
+ * その絞り込みは RLS が行う。ここでは自分以外の行を取りに行くだけでよい。
+ * 所有者の表示名は接続済みなら profiles から読める。
+ */
+export async function getSharedSplitRecords(userId: string): Promise<SharedSplitRecord[]> {
+  const supabase = await createClient()
+
+  const rows = await read<SplitRecord[]>('records', () =>
+    supabase
+      .from('records')
+      .select('*')
+      .neq('user_id', userId)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+  )
+  if (!rows || rows.length === 0) return []
+
+  const ownerIds = [...new Set(rows.map((r) => r.user_id))]
+  const owners = await read<Profile[]>('profiles', () =>
+    supabase.from('profiles').select('*').in('id', ownerIds)
+  )
+  const ownerById = new Map((owners ?? []).map((p) => [p.id, p]))
+
+  return rows.map((row) => ({
+    ...row,
+    owner_name: ownerById.get(row.user_id)?.display_name ?? '',
+    owner_marine_id: ownerById.get(row.user_id)?.marine_id ?? '',
+  }))
+}
+
+/**
+ * 貯金の参加者ごとの累計（自分＋貯金に参加している接続済みメンバー）。
+ *
+ * 「累計貯金額」は月末に確定した月次金額の合計とする。今月のように
+ * まだ確定していない月は累計に含めず、pending として別に返す。
+ */
+export async function getSavingCircleTotals(): Promise<SavingCircleTotal[]> {
+  const supabase = await createClient()
+  const rows = await read<SavingCircleTotal[]>('saving_circle_totals', () =>
+    supabase.rpc('saving_circle_totals')
+  )
+  return (rows ?? []).map((row) => ({
+    ...row,
+    confirmed: Number(row.confirmed),
+    pending: Number(row.pending),
+  }))
+}
+
+/**
+ * 共同目標と、その進捗（仕様書17章）。
+ *
+ * 目標そのものは RLS でメンバーだけが読める。進捗は shared_goal_progress() が
+ * メンバーごとの合計だけを返す（相手の月次明細は読めない）。
+ * 達成率は確定済みの合計で見る。未確定の見込みは別に持ち、合計には足さない。
+ */
+export async function getSharedGoals(): Promise<SharedGoalView[]> {
+  const supabase = await createClient()
+
+  const goals = await read<SharedGoalRow[]>('shared_goals', () =>
+    supabase.from('shared_goals').select('*').order('created_at', { ascending: false })
+  )
+  if (!goals || goals.length === 0) return []
+
+  const progresses = await Promise.all(
+    goals.map((goal) =>
+      read<SharedGoalMemberProgress[]>('shared_goal_progress', () =>
+        supabase.rpc('shared_goal_progress', { p_goal_id: goal.id })
+      )
+    )
+  )
+
+  return goals.map((goal, index) => {
+    const progress = (progresses[index] ?? []).map((row) => ({
+      ...row,
+      confirmed: Number(row.confirmed),
+      pending: Number(row.pending),
+    }))
+    return {
+      ...goal,
+      progress,
+      confirmed_total: progress.reduce((sum, row) => sum + row.confirmed, 0),
+      pending_total: progress.reduce((sum, row) => sum + row.pending, 0),
+    }
+  })
 }

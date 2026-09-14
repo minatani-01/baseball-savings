@@ -14,9 +14,10 @@ import {
   getSavingEntries,
   getSavingRules,
   getSessionUser,
+  getSavingCircleTotals,
   getSplitRecords,
 } from '@/lib/queries'
-import { monthOverMonth, streakDays } from '@/lib/insights'
+import { confirmedTotal, monthOverMonth, streakDays } from '@/lib/insights'
 import { currentMonth, isMonthClosed, monthLabel, shortDate, yen } from '@/lib/format'
 import { MONTHLY_STATUS_LABEL, opponentLabel, resultLabel } from '@/lib/constants'
 import type { ExpenseCategory, MonthlyStatus } from '@/types'
@@ -43,15 +44,22 @@ export default async function HomePage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const [entries, monthlySavings, records, rules] = await Promise.all([
+  const [entries, monthlySavings, records, rules, circle] = await Promise.all([
     getSavingEntries(user.id),
     getMonthlySavings(user.id),
     getSplitRecords(user.id),
     getSavingRules(user.id),
+    getSavingCircleTotals(),
   ])
 
   const month = currentMonth()
-  const total = entries.reduce((sum, e) => sum + e.amount, 0)
+  // 累計貯金額は「月末に確定した月次金額」の合計。今月のように未確定の月は含めない。
+  // 定義は lib/insights.ts の confirmedTotal に集約してあり、貯金・履歴と同じ値になる
+  const myTotal = confirmedTotal(monthlySavings)
+  // 総累計は自分の分を myTotal で置き換えて、1人分の表示と必ず一致させる
+  const circleTotal =
+    myTotal + circle.filter((row) => !row.is_self).reduce((sum, row) => sum + row.confirmed, 0)
+  const circleSize = circle.filter((row) => row.is_visible).length
   const monthEntries = entries.filter((e) => e.month === month)
   const monthTotal = monthEntries.reduce((sum, e) => sum + e.amount, 0)
   const unpaid = records.filter((r) => r.status === 'unpaid')
@@ -63,12 +71,30 @@ export default async function HomePage() {
   const status: MonthlyStatus = monthly?.status ?? 'calculating'
 
   // 締めが終わっているのに入金まで進んでいない月をホームで先に促す
-  const pendingMonth = monthlySavings.find((m) => m.status !== 'deposited' && isMonthClosed(m.month))
+  // 締めが終わった月のうち、まだワンバンクへ入金していないもの。
+  // 何か月も溜まることがあるので、一番古い月を先頭にして件数も出す。
+  // 直近の月だけを名指しすると「8月分が未入金」と読めてしまい、
+  // 実際には3月から溜まっていることが伝わらない。
+  const pendingMonths = monthlySavings
+    .filter((m) => m.status !== 'deposited' && isMonthClosed(m.month))
+    .sort((a, b) => a.month.localeCompare(b.month))
+  const oldestPending = pendingMonths[0] ?? null
+  const newestPending = pendingMonths[pendingMonths.length - 1] ?? null
+
+  // 締めが終わっているのに月末確定すらしていない月
   const unconfirmedClosedMonth = [...new Set(entries.map((e) => e.month))]
     .filter((m) => isMonthClosed(m))
-    .sort((a, b) => b.localeCompare(a))
+    .sort((a, b) => a.localeCompare(b))
     .find((m) => !monthlySavings.some((row) => row.month === m))
-  const alertMonth = pendingMonth?.month ?? unconfirmedClosedMonth ?? null
+  const alertMonth = oldestPending?.month ?? unconfirmedClosedMonth ?? null
+
+  const pendingLabel = (() => {
+    if (!oldestPending || !newestPending) return ''
+    if (pendingMonths.length === 1) {
+      return `${monthLabel(oldestPending.month)}分のワンバンク入金が残っています`
+    }
+    return `${monthLabel(oldestPending.month)}〜${monthLabel(newestPending.month)}の${pendingMonths.length}か月分のワンバンク入金が残っています`
+  })()
 
   const activities: Activity[] = [
     ...entries.slice(0, 10).map<Activity>((entry) => ({
@@ -111,9 +137,22 @@ export default async function HomePage() {
       <Card className="glow">
         <div className="eyebrow">累計貯金額</div>
         <div className="mt-2 flex items-baseline gap-3">
-          <Amount value={total} size="xl" tone="marine" />
+          <Amount value={myTotal} size="xl" tone="marine" />
           <DeltaBadge percent={delta} />
         </div>
+        <div className="mt-1 text-[11px] text-fg-mute">
+          1人分 / 月末に確定した金額の合計（今月分は含みません）
+        </div>
+
+        {circleSize > 1 ? (
+          <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-line pt-3">
+            <div>
+              <div className="eyebrow">総累計貯金額</div>
+              <div className="mt-0.5 text-[11px] text-fg-mute">{circleSize}人分</div>
+            </div>
+            <div className="tnum text-xl font-semibold">{yen(circleTotal)}</div>
+          </div>
+        ) : null}
 
         <div className="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-4">
           <div>
@@ -180,13 +219,11 @@ export default async function HomePage() {
         <Card>
           <div className="flex items-start justify-between gap-3">
             <p className="text-sm">
-              {pendingMonth
-                ? `${monthLabel(pendingMonth.month)}分のワンバンク入金が完了していません`
-                : `${monthLabel(alertMonth)}分の金額がまだ確定していません`}
+              {oldestPending ? pendingLabel : `${monthLabel(alertMonth)}分の金額がまだ確定していません`}
             </p>
-            {pendingMonth ? (
-              <StatusPill tone={STATUS_TONE[pendingMonth.status]}>
-                {MONTHLY_STATUS_LABEL[pendingMonth.status]}
+            {oldestPending ? (
+              <StatusPill tone={STATUS_TONE[oldestPending.status]}>
+                {MONTHLY_STATUS_LABEL[oldestPending.status]}
               </StatusPill>
             ) : null}
           </div>

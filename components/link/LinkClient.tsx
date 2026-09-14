@@ -15,10 +15,16 @@ import {
   inputClass,
 } from '@/components/ui'
 import { IconCheck, IconClose, IconCopy, IconLink, IconTrash } from '@/components/icons'
+import SharedGoals from '@/components/link/SharedGoals'
 import { createClient } from '@/lib/supabase/client'
 import { LINK_RESOURCE_META } from '@/lib/constants'
 import { monthLabel, yen } from '@/lib/format'
-import type { LinkMonthlyCompare, LinkResource, MarineLinkView } from '@/types'
+import type {
+  LinkMonthlyCompare,
+  LinkResource,
+  MarineLinkView,
+  SharedGoalView,
+} from '@/types'
 
 /**
  * Marine Link（仕様書 13章・14章・16章 / Phase 4）。
@@ -35,6 +41,7 @@ export default function LinkClient({
   month,
   myMonthTotal,
   compare,
+  goals,
 }: {
   userId: string
   marineId: string
@@ -42,6 +49,7 @@ export default function LinkClient({
   month: string
   myMonthTotal: number
   compare: LinkMonthlyCompare[]
+  goals: SharedGoalView[]
 }) {
   const router = useRouter()
   const [links, setLinks] = useState(initialLinks)
@@ -317,6 +325,9 @@ export default function LinkClient({
           </div>
         )}
       </div>
+
+      {/* 共同貯金（仕様書 17章） */}
+      <SharedGoals userId={userId} goals={goals} connected={connected} />
 
       {/* 月間比較（仕様書 16章） */}
       {compare.length > 0 ? (
