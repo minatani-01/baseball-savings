@@ -31,7 +31,7 @@ import GameSheet from '@/components/savings/GameSheet'
 import CustomSavingSheet from '@/components/savings/CustomSavingSheet'
 import { createClient } from '@/lib/supabase/client'
 import { BREAKDOWN_GROUP_LABEL, groupBreakdown } from '@/lib/savings'
-import { goalProgress, monthOverMonth } from '@/lib/insights'
+import { confirmedTotal, goalProgress, monthOverMonth, pendingTotal } from '@/lib/insights'
 import { currentMonth, monthLabel, monthLabelEn, shortDate, yen } from '@/lib/format'
 import {
   MONTHLY_STATUS_LABEL,
@@ -40,7 +40,7 @@ import {
   pitchingHighlightLabel,
   resultLabel,
 } from '@/lib/constants'
-import type { MonthlySaving, MonthlyStatus, SavingEntryRow, SavingRules } from '@/types'
+import type { MonthlySaving, MonthlyStatus, SavingEntryRow, SavingRules, SharedGoalView } from '@/types'
 
 const STATUS_TONE: Record<MonthlyStatus, 'neutral' | 'marine' | 'warn' | 'done'> = {
   calculating: 'neutral',
@@ -56,11 +56,14 @@ export default function SavingsClient({
   entries,
   monthlySavings,
   rules,
+  goals,
 }: {
   userId: string
   entries: SavingEntryRow[]
   monthlySavings: MonthlySaving[]
   rules: SavingRules
+  /** 共同貯金（仕様書17章はロッテ貯金内の機能と定めている） */
+  goals: SharedGoalView[]
 }) {
   const router = useRouter()
   const [sheetMode, setSheetMode] = useState<SheetMode | null>(null)
@@ -76,7 +79,12 @@ export default function SavingsClient({
 
   const [month, setMonth] = useState(() => months[0] ?? currentMonth())
 
-  const total = useMemo(() => entries.reduce((sum, e) => sum + e.amount, 0), [entries])
+  // 累計は「月末に確定した月」だけを数える（ホーム・履歴と同じ定義）
+  const total = useMemo(() => confirmedTotal(monthlySavings), [monthlySavings])
+  const notConfirmed = useMemo(
+    () => pendingTotal(entries, monthlySavings),
+    [entries, monthlySavings]
+  )
   const delta = useMemo(() => monthOverMonth(entries, month), [entries, month])
 
   const monthEntries = useMemo(
@@ -146,8 +154,43 @@ export default function SavingsClient({
           <Amount value={total} size="xl" tone="marine" />
           <DeltaBadge percent={delta} />
         </div>
-        <p className="mt-2 text-xs text-fg-mute">{entries.length} 件の記録</p>
+        <p className="mt-2 text-xs text-fg-mute">
+          月末に確定した金額の合計（今月分は含みません）
+          {notConfirmed > 0 ? ` / 未確定 ${yen(notConfirmed)}` : ''}
+        </p>
       </Card>
+
+      {/* 共同貯金（仕様書17章 / 設定は Marine Link 側で行う） */}
+      {goals.length > 0 ? (
+        <div>
+          <SectionLabel
+            action={
+              <Link
+                href="/me/link"
+                prefetch={false}
+                className="text-[12px] text-fg-dim hover:text-marine"
+              >
+                設定
+              </Link>
+            }
+          >
+            共同貯金
+          </SectionLabel>
+          <div className="flex flex-col gap-2">
+            {goals.map((goal) => (
+              <Card key={goal.id}>
+                <div className="mb-3 truncate text-sm font-medium">{goal.title}</div>
+                <ProgressBar
+                  value={goal.confirmed_total}
+                  max={goal.target_amount}
+                  label={`${goal.progress.length}人で達成`}
+                  caption={`${yen(goal.confirmed_total)} / ${yen(goal.target_amount)}`}
+                />
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {/* 貯金する */}
       <div>

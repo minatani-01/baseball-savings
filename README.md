@@ -64,6 +64,9 @@ Supabase の SQL Editor で番号順に実行します（何度実行しても�
 | `0003_confirmed_ui.sql` | 確定UIに合わせたボーナス項目とカスタム貯金の追加 |
 | `0004_home_away_nullable.sql` | 旧アプリが未記録だったホーム/ビジターを null 許容にする |
 | `0005_marine_link.sql` | Marine Link（`marine_links` / `link_permissions` / 判定関数 / RPC / 共有用ポリシー） |
+| `0006_shared_goals.sql` | 共同貯金（`shared_goals` / `shared_goal_members` / 進捗RPC） |
+| `0007_split_member_marine_id.sql` | メンバーの Marine ID と、参加者単位の割り勘共有 |
+| `0008_member_participation.sql` | メンバーの参加機能（割り勘 / 貯金）と、貯金の参加者別集計RPC |
 
 ## デプロイ
 
@@ -84,8 +87,9 @@ master への push で Vercel が Production を自動デプロイします。�
 貯金          試合登録・カスタム貯金 / 月間集計と目標進捗 / 月末確定・ワンバンク入金 / 貯金ルール
 割り勘        未精算サマリーと支払い状況 / メンバー / 精算（PayPay誘導）/ 未精算・すべて・完了
 履歴          貯金推移 / 取引履歴 / 月別 / 年別
-マイページ    Marine ID / 表示名 / 外部アプリ起動URL / お知らせ / Marine Link / ログアウト
-  └ Marine Link   接続リクエストと承認 / 接続ごとの共有権限 / 月間比較
+マイページ    Marine ID / 表示名 / 外部アプリ起動URL / お知らせ / メンバー / Marine Link / ログアウト
+  ├ メンバー      一緒に使う人 / Marine ID / 割り勘・貯金への参加
+  └ Marine Link   接続リクエストと承認 / 接続ごとの共有権限 / 共同貯金 / 月間比較
 ```
 
 ## 実装状況
@@ -97,7 +101,7 @@ master への push で Vercel が Production を自動デプロイします。�
 | Phase 1 統合基盤 | 実装済み |
 | Phase 2 ロッテ貯金自動化 | 手動登録のみ実装。NPBからの自動取得は未着手 |
 | Phase 3 外部アプリ連携 | 金額コピーと起動URLは実装済み。入金ステータスは月末フローに内包 |
-| Phase 4 Marine Link | 実装済み（Marine ID / リクエスト / 権限管理 / データ共有 / 月間比較） |
+| Phase 4 Marine Link | 実装済み（Marine ID / リクエスト / 権限管理 / データ共有 / 月間比較 / 共同貯金） |
 | Phase 5 Marine Day | 未着手 |
 | Phase 6 Insight | 履歴・推移は実装済み。Season Report / Fan Score / 通知は未着手 |
 
@@ -114,6 +118,14 @@ master への push で Vercel が Production を自動デプロイします。�
 - **ワンバンク入金は月末に1回**。`monthly_savings` が
   `calculating → ready → deposit_pending → deposited` の状態を管理します。
 - **UIに絵文字は使わない**（仕様書 4.1）。アイコンはすべて `components/icons.tsx` の SVG ラインアイコンです。
+- **累計貯金額は確定した月だけを数える**。月末に「確定」した `monthly_savings.confirmed_amount`
+  の合計で、今月のように未確定の月は含めません（未確定分は見込みとして別に扱います）。
+  1人分の累計と、貯金に参加している接続済みメンバーを合算した総累計を分けて出します。
+- **割り勘の共有は参加者単位**。メンバーに Marine ID を登録すると、接続済みかつ
+  そのメンバーが参加している割り勘だけが相手から見えます。参加していない記録は見えません。
+- **共同貯金は記録上の目標**（仕様書17章）。資金は各自のワンバンクのままで、
+  達成率は確定済みの合計で見ます。相手の月次明細は読めず、`shared_goal_progress()` が
+  メンバーごとの合計だけを返します。
 - **共有は方向を持つ**（Marine Link）。仕様書 33章の `link_permissions` に `owner_id`
   を足し、「AがBに見せるもの」と「BがAに見せるもの」を別に持ちます。共有相手に開くのは
   SELECT だけで、書き換えの経路は作りません。判定は `marine_link_allows()` を通した

@@ -17,7 +17,7 @@ import {
   getSavingCircleTotals,
   getSplitRecords,
 } from '@/lib/queries'
-import { monthOverMonth, streakDays } from '@/lib/insights'
+import { confirmedTotal, monthOverMonth, streakDays } from '@/lib/insights'
 import { currentMonth, isMonthClosed, monthLabel, shortDate, yen } from '@/lib/format'
 import { MONTHLY_STATUS_LABEL, opponentLabel, resultLabel } from '@/lib/constants'
 import type { ExpenseCategory, MonthlyStatus } from '@/types'
@@ -53,9 +53,12 @@ export default async function HomePage() {
   ])
 
   const month = currentMonth()
-  // 累計貯金額は「月末に確定した月次金額」の合計。今月のように未確定の月は含めない
-  const myTotal = circle.find((row) => row.is_self)?.confirmed ?? 0
-  const circleTotal = circle.reduce((sum, row) => sum + row.confirmed, 0)
+  // 累計貯金額は「月末に確定した月次金額」の合計。今月のように未確定の月は含めない。
+  // 定義は lib/insights.ts の confirmedTotal に集約してあり、貯金・履歴と同じ値になる
+  const myTotal = confirmedTotal(monthlySavings)
+  // 総累計は自分の分を myTotal で置き換えて、1人分の表示と必ず一致させる
+  const circleTotal =
+    myTotal + circle.filter((row) => !row.is_self).reduce((sum, row) => sum + row.confirmed, 0)
   const circleSize = circle.filter((row) => row.is_visible).length
   const monthEntries = entries.filter((e) => e.month === month)
   const monthTotal = monthEntries.reduce((sum, e) => sum + e.amount, 0)
@@ -68,12 +71,30 @@ export default async function HomePage() {
   const status: MonthlyStatus = monthly?.status ?? 'calculating'
 
   // 締めが終わっているのに入金まで進んでいない月をホームで先に促す
-  const pendingMonth = monthlySavings.find((m) => m.status !== 'deposited' && isMonthClosed(m.month))
+  // 締めが終わった月のうち、まだワンバンクへ入金していないもの。
+  // 何か月も溜まることがあるので、一番古い月を先頭にして件数も出す。
+  // 直近の月だけを名指しすると「8月分が未入金」と読めてしまい、
+  // 実際には3月から溜まっていることが伝わらない。
+  const pendingMonths = monthlySavings
+    .filter((m) => m.status !== 'deposited' && isMonthClosed(m.month))
+    .sort((a, b) => a.month.localeCompare(b.month))
+  const oldestPending = pendingMonths[0] ?? null
+  const newestPending = pendingMonths[pendingMonths.length - 1] ?? null
+
+  // 締めが終わっているのに月末確定すらしていない月
   const unconfirmedClosedMonth = [...new Set(entries.map((e) => e.month))]
     .filter((m) => isMonthClosed(m))
-    .sort((a, b) => b.localeCompare(a))
+    .sort((a, b) => a.localeCompare(b))
     .find((m) => !monthlySavings.some((row) => row.month === m))
-  const alertMonth = pendingMonth?.month ?? unconfirmedClosedMonth ?? null
+  const alertMonth = oldestPending?.month ?? unconfirmedClosedMonth ?? null
+
+  const pendingLabel = (() => {
+    if (!oldestPending || !newestPending) return ''
+    if (pendingMonths.length === 1) {
+      return `${monthLabel(oldestPending.month)}分のワンバンク入金が残っています`
+    }
+    return `${monthLabel(oldestPending.month)}〜${monthLabel(newestPending.month)}の${pendingMonths.length}か月分のワンバンク入金が残っています`
+  })()
 
   const activities: Activity[] = [
     ...entries.slice(0, 10).map<Activity>((entry) => ({
@@ -198,13 +219,11 @@ export default async function HomePage() {
         <Card>
           <div className="flex items-start justify-between gap-3">
             <p className="text-sm">
-              {pendingMonth
-                ? `${monthLabel(pendingMonth.month)}分のワンバンク入金が完了していません`
-                : `${monthLabel(alertMonth)}分の金額がまだ確定していません`}
+              {oldestPending ? pendingLabel : `${monthLabel(alertMonth)}分の金額がまだ確定していません`}
             </p>
-            {pendingMonth ? (
-              <StatusPill tone={STATUS_TONE[pendingMonth.status]}>
-                {MONTHLY_STATUS_LABEL[pendingMonth.status]}
+            {oldestPending ? (
+              <StatusPill tone={STATUS_TONE[oldestPending.status]}>
+                {MONTHLY_STATUS_LABEL[oldestPending.status]}
               </StatusPill>
             ) : null}
           </div>

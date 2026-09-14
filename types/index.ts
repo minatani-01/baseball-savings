@@ -249,3 +249,37 @@ export type SavingCircleTotal = {
   confirmed: number
   pending: number
 }
+
+// ------------------------------------------------- 共同貯金（仕様書17章） ----
+export type SharedGoalRow = {
+  id: string
+  marine_link_id: string
+  title: string
+  target_amount: number
+  /** 'YYYY-MM'。null は期間の制限なし */
+  start_month: string | null
+  end_month: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * 共同目標のメンバーごとの進捗。
+ * confirmed は月末に確定した月次金額の合計で、未確定の月は pending に入る。
+ */
+export type SharedGoalMemberProgress = {
+  user_id: string
+  display_name: string
+  marine_id: string
+  confirmed: number
+  pending: number
+}
+
+export type SharedGoalView = SharedGoalRow & {
+  progress: SharedGoalMemberProgress[]
+  /** 確定済みの合計。達成率はこの値で見る */
+  confirmed_total: number
+  /** 未確定の見込み合計。達成率には入れない */
+  pending_total: number
+}

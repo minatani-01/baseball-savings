@@ -14,6 +14,9 @@ import type {
   SavingEntryRow,
   SavingRules,
   SavingCircleTotal,
+  SharedGoalMemberProgress,
+  SharedGoalRow,
+  SharedGoalView,
   SharedSplitRecord,
   SplitMember,
   SplitRecord,
@@ -352,4 +355,42 @@ export async function getSavingCircleTotals(): Promise<SavingCircleTotal[]> {
     confirmed: Number(row.confirmed),
     pending: Number(row.pending),
   }))
+}
+
+/**
+ * 共同目標と、その進捗（仕様書17章）。
+ *
+ * 目標そのものは RLS でメンバーだけが読める。進捗は shared_goal_progress() が
+ * メンバーごとの合計だけを返す（相手の月次明細は読めない）。
+ * 達成率は確定済みの合計で見る。未確定の見込みは別に持ち、合計には足さない。
+ */
+export async function getSharedGoals(): Promise<SharedGoalView[]> {
+  const supabase = await createClient()
+
+  const goals = await read<SharedGoalRow[]>('shared_goals', () =>
+    supabase.from('shared_goals').select('*').order('created_at', { ascending: false })
+  )
+  if (!goals || goals.length === 0) return []
+
+  const progresses = await Promise.all(
+    goals.map((goal) =>
+      read<SharedGoalMemberProgress[]>('shared_goal_progress', () =>
+        supabase.rpc('shared_goal_progress', { p_goal_id: goal.id })
+      )
+    )
+  )
+
+  return goals.map((goal, index) => {
+    const progress = (progresses[index] ?? []).map((row) => ({
+      ...row,
+      confirmed: Number(row.confirmed),
+      pending: Number(row.pending),
+    }))
+    return {
+      ...goal,
+      progress,
+      confirmed_total: progress.reduce((sum, row) => sum + row.confirmed, 0),
+      pending_total: progress.reduce((sum, row) => sum + row.pending, 0),
+    }
+  })
 }
