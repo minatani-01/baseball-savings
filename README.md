@@ -13,7 +13,7 @@
 | --- | --- |
 | リポジトリ | `minatani-01/marine-wallet`（旧 `baseball-savings` を改称） |
 | 公開URL | https://marine-wallet.vercel.app |
-| Vercelプロジェクト名 | `baseball-savings`（改称していないだけで、デプロイ先は上記URL） |
+| Vercelプロジェクト名 | `marine-wallet` |
 | Supabase | Marine Wallet（ref `xliszlnpypvqghrwplxa`） |
 
 ## 統合元
