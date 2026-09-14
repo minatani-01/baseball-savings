@@ -287,12 +287,44 @@ Route Handler は `CRON_SECRET` を検証してから実行する。
 
 ### 5.3 実装順序
 
-1. `npb_player_stat_snapshots` / `npb_games` のマイグレーション
-2. パーサーを純関数として実装し、本書に記録した実 HTML を
-   フィクスチャとしてユニットテストを書く
-3. Route Handler と Cron を追加し、まず「取得して貯めるだけ」で動かす
+1. `npb_player_stat_snapshots` / `npb_games` のマイグレーション（0021 で適用済み）
+2. パーサーを純関数として実装し、ユニットテストを書く（`lib/npb/` に実装済み）
+3. Route Handler と Cron を追加し、まず「取得して貯めるだけ」で動かす（実装済み・未稼働）
 4. 数日分たまったら差分計算の結果を既存の手入力データと突き合わせて検証
 5. 検証が通ったら `games` への自動反映と貯金エントリ生成をつなぐ
+
+### 5.4 稼働させるのに必要な設定
+
+Vercel のプロジェクト設定で、次の2つの環境変数を追加する。
+どちらも `NEXT_PUBLIC_` を付けない（ブラウザに渡ってはいけない）。
+
+| 変数名 | 値 |
+|---|---|
+| `CRON_SECRET` | 任意の長い文字列。Vercel Cron が `Authorization: Bearer <値>` で送る |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase の service_role キー |
+
+`SUPABASE_SERVICE_ROLE_KEY` は RLS を迂回する。リポジトリは公開なので、
+コードにも `.env` にも書かず、Vercel のダッシュボードで直接入力する。
+
+設定が終わるまで Cron は 500 を返して何も保存しない。
+手で動作を確かめるときは次のようにする。
+
+```
+curl -H "Authorization: Bearer <CRON_SECRET>" \
+  https://marine-wallet.vercel.app/api/cron/npb-sync
+```
+
+実行の記録は `npb_sync_runs` に残る。`ok` と `summary`（取得ページ数・
+保存件数・スナップショットの基準日・警告）を見れば、
+取得が飛んだ日や構造の変化に気づける。
+
+### 5.5 実装上の注意
+
+- **Middleware を通さないこと**。`proxy.ts` の認証ガードは全リクエストを通るため、
+  `/api/cron/` を除外しないと Cron がログイン画面へリダイレクトされて実行できない。
+  代わりに Route Handler 側で `CRON_SECRET` を確かめる
+- **パラメータプロパティを使わないこと**。Node の型ストリップが未対応で、
+  `node:test` から読み込めなくなる
 
 ---
 

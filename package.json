@@ -9,7 +9,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --import ./scripts/test-resolver.mjs --test \"lib/**/__tests__/*.test.ts\""
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
