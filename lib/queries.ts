@@ -208,7 +208,7 @@ export async function getSavingEntries(userId: string): Promise<SavingEntryRow[]
       .order('entry_date', { ascending: false })
   )
 
-  // kind='custom' は game が null。試合貯金なのに game が取れない行だけを除外する
+  // kind='custom' は game が null。自動登録なのに game が取れない行だけを除外する
   return (data ?? []).filter((entry) => entry.kind === 'custom' || Boolean(entry.game))
 }
 

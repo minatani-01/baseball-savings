@@ -10,8 +10,11 @@ import type { SavingEntryRow } from '@/types'
 const QUICK_AMOUNTS = [300, 500, 1000, 3000]
 
 /**
- * カスタム貯金（仕様書の自動計算とは別に、試合に紐づかない任意額を積み立てる）。
+ * カスタム登録（試合結果から自動計算できない分を任意額で積み立てる）。
  * saving_entries に kind='custom' / game_id=null で保存する。
+ *
+ * NPB 公式は1試合ごとの個人打撃成績を公開していないため、
+ * マルチ安打と打点は自動登録では扱わず、ここで登録する。
  */
 export default function CustomSavingSheet({
   entry,
@@ -66,7 +69,7 @@ export default function CustomSavingSheet({
 
   return (
     <Sheet
-      title={entry ? 'カスタム貯金を編集' : 'カスタム貯金'}
+      title={entry ? 'カスタム登録を編集' : 'カスタム登録'}
       onClose={onClose}
       footer={
         <div className="flex flex-col gap-2">
@@ -92,7 +95,7 @@ export default function CustomSavingSheet({
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="例: 開幕記念 / 推し選手の猛打賞"
+            placeholder="例: マルチ安打 2人 / 打点 3"
             className={inputClass}
           />
         </Field>
@@ -134,7 +137,7 @@ export default function CustomSavingSheet({
             <Amount value={parsedAmount} size="lg" tone="marine" />
           </div>
           <p className="mt-2 text-[11px] text-fg-mute">
-            カスタム貯金にはフェーズ倍率も貯金ルールも適用されません。
+            カスタム登録にはフェーズ倍率も貯金ルールも適用されません。
           </p>
         </div>
       </div>

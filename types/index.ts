@@ -74,7 +74,7 @@ export type SavingEntry = {
   /** kind='custom' のときは null */
   game_id: string | null
   kind: SavingKind
-  /** カスタム貯金の内容。試合貯金では空文字 */
+  /** カスタム登録の内容。自動登録では空文字 */
   title: string
   entry_date: string
   /** 'YYYY-MM'（DB側の生成列） */
@@ -87,7 +87,7 @@ export type SavingEntry = {
   updated_at: string
 }
 
-/** 試合を結合した積立。カスタム貯金では game が null になる */
+/** 試合を結合した積立。カスタム登録では game が null になる */
 export type SavingEntryRow = SavingEntry & { game: Game | null }
 
 /**

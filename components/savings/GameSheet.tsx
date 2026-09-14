@@ -44,6 +44,12 @@ type FormState = {
   opponent_score: string
   home_runs: number
   grand_slams: number
+  /**
+   * マルチ安打と打点は NPB 公式が1試合ごとの個人成績を公開していないため、
+   * 自動登録では扱わない（カスタム登録で積み立てる）。
+   * ここで保持しているのは、過去に手入力された試合を編集したときに
+   * 既存の値をゼロで上書きしないようにするためだけである。
+   */
   multi_hits: number
   rbi: number
   pitching_highlight: PitchingHighlight
@@ -54,7 +60,7 @@ type FormState = {
 }
 
 function toForm(entry: SavingEntryRow | null): FormState {
-  // カスタム貯金（game が null）は GameSheet では編集しないため、新規と同じ初期値にする
+  // カスタム登録（game が null）は GameSheet では編集しないため、新規と同じ初期値にする
   if (!entry || !entry.game) {
     return {
       game_date: today(),
@@ -285,13 +291,13 @@ export default function GameSheet({
 
   return (
     <Sheet
-      title={entry ? '試合記録を編集' : '試合を記録'}
+      title={entry ? '試合記録を編集' : '自動登録'}
       onClose={onClose}
       footer={
         <div className="flex flex-col gap-2">
           {error ? <p className="text-[13px] text-danger">{error}</p> : null}
           <Button variant="primary" full onClick={save} disabled={saving}>
-            {saving ? '保存中' : entry ? '更新する' : '記録する'}
+            {saving ? '保存中' : entry ? '更新する' : '登録する'}
           </Button>
         </div>
       }
@@ -399,35 +405,19 @@ export default function GameSheet({
         </Field>
 
         <Field label="打撃ボーナス" hint="満塁HRはホームランに含めず別に数える">
-          <div className="flex flex-col gap-3">
-            <div className="flex gap-3">
-              <Counter
-                label="ホームラン"
-                hint={`+¥${rules.home_run_amount}/本`}
-                value={form.home_runs}
-                onChange={(v) => upd('home_runs', v)}
-              />
-              <Counter
-                label="満塁ホームラン"
-                hint={`+¥${rules.grand_slam_amount}/本`}
-                value={form.grand_slams}
-                onChange={(v) => upd('grand_slams', v)}
-              />
-            </div>
-            <div className="flex gap-3">
-              <Counter
-                label="マルチ安打"
-                hint={`+¥${rules.multi_hit_amount}/人`}
-                value={form.multi_hits}
-                onChange={(v) => upd('multi_hits', v)}
-              />
-              <Counter
-                label="打点"
-                hint={`+¥${rules.rbi_amount}/点`}
-                value={form.rbi}
-                onChange={(v) => upd('rbi', v)}
-              />
-            </div>
+          <div className="flex gap-3">
+            <Counter
+              label="ホームラン"
+              hint={`+¥${rules.home_run_amount}/本`}
+              value={form.home_runs}
+              onChange={(v) => upd('home_runs', v)}
+            />
+            <Counter
+              label="満塁ホームラン"
+              hint={`+¥${rules.grand_slam_amount}/本`}
+              value={form.grand_slams}
+              onChange={(v) => upd('grand_slams', v)}
+            />
           </div>
         </Field>
 
