@@ -1,5 +1,6 @@
 import type {
   ExpenseCategory,
+  LinkResource,
   GameResult,
   HomeAway,
   MonthlyStatus,
@@ -129,3 +130,19 @@ export const EXTERNAL_APPS: Record<
 }
 
 export const APP_LINK_STORAGE_KEY = 'marine_wallet_app_links_v1'
+
+/**
+ * Marine Link で共有できるリソース（仕様書 14章）。
+ * 観戦情報 / Marine Day / Beer Log / 共同目標 は Phase 5 以降で追加する。
+ * 試合情報は仕様書 15章のとおり全ユーザー共通なので、権限の対象にしない。
+ */
+export const LINK_RESOURCE_META: {
+  id: LinkResource
+  label: string
+  hint: string
+}[] = [
+  { id: 'saving', label: 'ロッテ貯金', hint: '積立の明細と月ごとの合計' },
+  { id: 'saving_rules', label: '貯金ルール', hint: '勝利・HRなどの金額設定と月間目標' },
+  { id: 'monthly', label: '月末入金状況', hint: '月末の確定額とワンバンク入金の進捗' },
+  { id: 'split', label: '割り勘', hint: '立替の記録と精算状況' },
+]

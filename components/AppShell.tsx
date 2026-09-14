@@ -30,6 +30,7 @@ const HEADERS: Record<string, { title: string; back?: string }> = {
   '/split/members': { title: 'メンバー', back: '/split' },
   '/history': { title: '履歴・グラフ' },
   '/me': { title: 'マイページ' },
+  '/me/link': { title: 'Marine Link', back: '/me' },
 }
 
 function isActive(pathname: string, href: string): boolean {
