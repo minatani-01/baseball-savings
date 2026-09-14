@@ -52,8 +52,15 @@ export async function proxy(request: NextRequest) {
   // /auth/callback は OAuth から ?code= 付きで戻ってくる地点で、
   // この時点ではまだセッションが無い。ここを弾くと code を交換できず、
   // Google ログインが必ず失敗する。
+  //
+  // /api/cron/* は Vercel Cron から呼ばれる。呼び出し元にブラウザはおらず
+  // セッションも無いので、ここで弾くとログイン画面へ飛ばされて実行できない。
+  // 代わりに Route Handler 側で CRON_SECRET を確かめる。
   const isPublic =
-    pathname === '/login' || pathname === '/auth' || pathname.startsWith('/auth/')
+    pathname === '/login' ||
+    pathname === '/auth' ||
+    pathname.startsWith('/auth/') ||
+    pathname.startsWith('/api/cron/')
 
   if (!signedIn && !isPublic) {
     return NextResponse.redirect(new URL('/login', request.url))
