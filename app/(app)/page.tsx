@@ -1,14 +1,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Amount, Card, DeltaBadge, EmptyState, IconFrame, SectionLabel, StatusPill } from '@/components/ui'
-import {
-  IconBaseball,
-  IconChevronRight,
-  IconSpark,
-  IconUsers,
-  IconWallet,
-} from '@/components/icons'
-import CategoryIcon from '@/components/CategoryIcon'
+import { Amount, Card, DeltaBadge, EmptyState, SectionLabel, StatusPill } from '@/components/ui'
+import { IconChevronRight, IconUsers, IconWallet } from '@/components/icons'
+import CumulativeChart, { type ChartPoint } from '@/components/charts/CumulativeChart'
 import {
   getMonthlySavings,
   getSavingEntries,
@@ -17,21 +11,17 @@ import {
   getSavingCircleTotals,
   getSplitRecords,
 } from '@/lib/queries'
-import { depositedTotal, formatWinRate, monthOverMonth, seasonRecord, streakDays } from '@/lib/insights'
+import {
+  depositedMonthSet,
+  depositedTotal,
+  formatWinRate,
+  monthOverMonth,
+  seasonRecord,
+  streakDays,
+} from '@/lib/insights'
 import { currentMonth, isMonthClosed, monthLabel, shortDate, today, yen } from '@/lib/format'
-import { MONTHLY_STATUS_LABEL, opponentLabel, resultLabel } from '@/lib/constants'
-import type { ExpenseCategory, MonthlyStatus } from '@/types'
-
-type Activity = {
-  key: string
-  date: string
-  title: string
-  caption: string
-  amount: number
-  kind: 'saving' | 'split'
-  category?: ExpenseCategory
-  isCustom?: boolean
-}
+import { MONTHLY_STATUS_LABEL } from '@/lib/constants'
+import type { MonthlyStatus } from '@/types'
 
 const STATUS_TONE: Record<MonthlyStatus, 'neutral' | 'marine' | 'warn' | 'done'> = {
   calculating: 'neutral',
@@ -66,6 +56,20 @@ export default async function HomePage() {
   const delta = monthOverMonth(entries, month)
   const streak = streakDays(entries)
 
+  // 貯金推移。履歴タブと同じく入金済みの月だけを積み、
+  // グラフの終点と上の累計貯金額を必ず一致させる
+  const deposited = depositedMonthSet(monthlySavings)
+  const chartPoints: ChartPoint[] = []
+  {
+    let cumulative = 0
+    for (const entry of [...entries]
+      .filter((e) => deposited.has(e.month))
+      .sort((a, b) => a.entry_date.localeCompare(b.entry_date))) {
+      cumulative += entry.amount
+      chartPoints.push({ date: entry.entry_date, value: cumulative })
+    }
+  }
+
   // 今季の戦績。貯金の記録に紐づく試合から数える（記録＝その年の試合そのもの）
   const record = seasonRecord(entries, Number(today().slice(0, 4)))
 
@@ -94,31 +98,6 @@ export default async function HomePage() {
     }
     return `${monthLabel(oldestPending.month)}〜${monthLabel(newestPending.month)}の${pendingMonths.length}か月分のワンバンク入金が残っています`
   })()
-
-  const activities: Activity[] = [
-    ...entries.slice(0, 10).map<Activity>((entry) => ({
-      key: `saving-${entry.id}`,
-      date: entry.entry_date,
-      title: entry.game
-        ? `${resultLabel(entry.game.result, entry.game.is_sayonara)} vs ${opponentLabel(entry.game.opponent)}`
-        : entry.title,
-      caption: entry.game ? '試合貯金' : 'カスタム貯金',
-      amount: entry.amount,
-      kind: 'saving',
-      isCustom: entry.kind === 'custom',
-    })),
-    ...records.slice(0, 10).map<Activity>((record) => ({
-      key: `split-${record.id}`,
-      date: record.date,
-      title: record.content,
-      caption: `割り勘 / ${record.payer} が立替`,
-      amount: record.amount,
-      kind: 'split',
-      category: record.category,
-    })),
-  ]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 6)
 
   return (
     <div className="flex flex-col gap-6">
@@ -247,7 +226,7 @@ export default async function HomePage() {
         </Card>
       ) : null}
 
-      {/* 最近のアクティビティ */}
+      {/* 貯金推移。履歴タブと同じ定義で積む（入金済みの月だけ） */}
       <div>
         <SectionLabel
           action={
@@ -256,56 +235,25 @@ export default async function HomePage() {
               prefetch={false}
               className="text-[12px] text-fg-dim hover:text-marine"
             >
-              すべて見る
+              履歴を見る
             </Link>
           }
         >
-          最近のアクティビティ
+          貯金推移
         </SectionLabel>
 
-        {activities.length === 0 ? (
+        {chartPoints.length === 0 ? (
           <EmptyState
-            title="まだ記録がありません"
-            description="貯金タブから試合を登録するか、割り勘タブで支出を登録してください。"
+            title="まだ入金した月がありません"
+            description="月末に金額を確定してワンバンクへ入金すると、ここに積み上がります。"
           />
         ) : (
-          <Card padded={false}>
-            <div className="divide-hairline px-4">
-              {activities.map((activity) => (
-                <div key={activity.key} className="flex items-center gap-3 py-3">
-                  <IconFrame tone={activity.kind === 'saving' ? 'marine' : 'default'}>
-                    {activity.kind === 'saving' ? (
-                      activity.isCustom ? (
-                        <IconSpark size={16} />
-                      ) : (
-                        <IconBaseball size={16} />
-                      )
-                    ) : (
-                      <CategoryIcon category={activity.category ?? 'other'} size={16} />
-                    )}
-                  </IconFrame>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px]">{activity.title}</div>
-                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-fg-mute">
-                      <span className="tnum">{shortDate(activity.date)}</span>
-                      <span className="truncate">{activity.caption}</span>
-                    </div>
-                  </div>
-
-                  <span
-                    className={`tnum shrink-0 text-sm font-semibold ${
-                      activity.kind === 'saving' ? 'text-marine' : 'text-fg'
-                    }`}
-                  >
-                    {yen(activity.amount)}
-                  </span>
-                </div>
-              ))}
-            </div>
+          <Card>
+            <CumulativeChart points={chartPoints} />
           </Card>
         )}
       </div>
+
     </div>
   )
 }
