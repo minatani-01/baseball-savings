@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Avatar, Button, Chip, Field, Segmented, Sheet, inputClass } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
+import { withTapFeedback } from '@/lib/haptics'
 import { distributeEqual, distributeRatio } from '@/lib/warikan'
 import { today, yen } from '@/lib/format'
 import { EXPENSE_CATEGORIES } from '@/lib/constants'
@@ -258,7 +259,11 @@ export default function SplitSheet({
         </Field>
 
         <Field label="決済者">
-          <select value={payer} onChange={(e) => setPayer(e.target.value)} className={inputClass}>
+          <select
+            value={payer}
+            onChange={withTapFeedback((e) => setPayer(e.target.value))}
+            className={inputClass}
+          >
             {selected.map((name) => (
               <option key={name} value={name}>
                 {name}

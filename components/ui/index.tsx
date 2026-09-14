@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { IconCheck, IconClose, IconMinus, IconPlus } from '@/components/icons'
 import { yen } from '@/lib/format'
+import { tapFeedback } from '@/lib/haptics'
 
 // ---------------------------------------------------------------- Card ----
 export function Card({
@@ -145,7 +146,10 @@ export function Chip({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        tapFeedback()
+        onClick()
+      }}
       aria-pressed={selected}
       className={`min-h-[44px] rounded-xl border px-3 py-2 text-sm transition-colors ${
         selected
@@ -174,7 +178,10 @@ export function Segmented<T extends string>({
         <button
           key={o.id}
           type="button"
-          onClick={() => onChange(o.id)}
+          onClick={() => {
+            tapFeedback()
+            onChange(o.id)
+          }}
           aria-pressed={value === o.id}
           className={`min-h-[38px] flex-1 rounded-lg px-2 text-[13px] transition-colors ${
             value === o.id ? 'bg-marine/15 text-marine font-medium' : 'text-fg-mute hover:text-fg'
@@ -253,7 +260,10 @@ export function Stepper({
   onChange: (next: number) => void
   min?: number
 }) {
-  const step = (delta: number) => onChange(Math.max(min, value + delta))
+  const step = (delta: number) => {
+    tapFeedback()
+    onChange(Math.max(min, value + delta))
+  }
   return (
     <div className="flex items-center gap-1">
       <button
@@ -293,7 +303,10 @@ export function Switch({
       role="switch"
       aria-checked={checked}
       aria-label={label}
-      onClick={() => onChange(!checked)}
+      onClick={() => {
+        tapFeedback()
+        onChange(!checked)
+      }}
       className={`relative h-5 w-9 rounded-full transition-colors ${checked ? 'bg-marine' : 'bg-line'}`}
     >
       <span
@@ -401,7 +414,10 @@ export function PillTabs<T extends string>({
         <button
           key={o.id}
           type="button"
-          onClick={() => onChange(o.id)}
+          onClick={() => {
+            tapFeedback()
+            onChange(o.id)
+          }}
           aria-pressed={value === o.id}
           className={`min-h-[38px] shrink-0 rounded-full border px-4 text-[13px] transition-colors ${
             value === o.id
@@ -523,7 +539,10 @@ export function Checkbox({
       role="checkbox"
       aria-checked={checked}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
+      onClick={() => {
+        tapFeedback()
+        onChange(!checked)
+      }}
       className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] transition-colors disabled:opacity-40 ${
         checked
           ? 'border-marine/60 bg-marine/10 text-marine'
@@ -572,7 +591,10 @@ export function Toggle({
         role="switch"
         aria-checked={checked}
         disabled={disabled}
-        onClick={() => onChange(!checked)}
+        onClick={() => {
+          tapFeedback()
+          onChange(!checked)
+        }}
         className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-colors ${
           checked ? 'border-marine/70 bg-marine/30' : 'border-line bg-white/[0.04]'
         } disabled:pointer-events-none`}
