@@ -17,10 +17,10 @@ import { createClient } from '@/lib/supabase/client'
 import { calcSaving } from '@/lib/savings'
 import { today } from '@/lib/format'
 import {
+  AUTO_PITCHING_HIGHLIGHTS,
   HOME_AWAY,
   OPPONENTS,
   PHASES,
-  PITCHING_HIGHLIGHTS,
   RESULTS,
 } from '@/lib/constants'
 import type {
@@ -39,17 +39,20 @@ type FormState = {
   home_away: HomeAway
   stadium: string
   result: GameResult
+  /**
+   * サヨナラ勝利・ノーヒットノーラン・完全試合・その他ボーナスは、
+   * NPB 公式から取得できないため自動登録では扱わない
+   * （カスタム登録で積み立てる）。
+   *
+   * 以下の項目を状態に残しているのは、過去に手入力された試合を
+   * 編集したときに既存の値をゼロで上書きしないようにするためだけである。
+   */
   is_sayonara: boolean
   marines_score: string
   opponent_score: string
   home_runs: number
   grand_slams: number
-  /**
-   * マルチ安打と打点は NPB 公式が1試合ごとの個人成績を公開していないため、
-   * 自動登録では扱わない（カスタム登録で積み立てる）。
-   * ここで保持しているのは、過去に手入力された試合を編集したときに
-   * 既存の値をゼロで上書きしないようにするためだけである。
-   */
+  /** マルチ安打と打点も同じ理由で自動登録では扱わない */
   multi_hits: number
   rbi: number
   pitching_highlight: PitchingHighlight
@@ -355,28 +358,16 @@ export default function GameSheet({
         </Field>
 
         <Field label="試合結果">
-          <div className="flex flex-col gap-2">
-            <div className="grid grid-cols-3 gap-2">
-              {RESULTS.map((r) => (
-                <Chip
-                  key={r.id}
-                  selected={form.result === r.id}
-                  onClick={() => {
-                    upd('result', r.id)
-                    if (r.id !== 'win') upd('is_sayonara', false)
-                  }}
-                >
-                  {r.label}
-                </Chip>
-              ))}
-            </div>
-            {form.result === 'win' ? (
-              <Toggle
-                label="サヨナラ勝利"
-                checked={form.is_sayonara}
-                onChange={(v) => upd('is_sayonara', v)}
-              />
-            ) : null}
+          <div className="grid grid-cols-3 gap-2">
+            {RESULTS.map((r) => (
+              <Chip
+                key={r.id}
+                selected={form.result === r.id}
+                onClick={() => upd('result', r.id)}
+              >
+                {r.label}
+              </Chip>
+            ))}
           </div>
         </Field>
 
@@ -428,7 +419,7 @@ export default function GameSheet({
               onChange={(e) => upd('pitching_highlight', e.target.value as PitchingHighlight)}
               className={inputClass}
             >
-              {PITCHING_HIGHLIGHTS.map((p) => (
+              {AUTO_PITCHING_HIGHLIGHTS.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.label}
                 </option>
@@ -440,29 +431,6 @@ export default function GameSheet({
               onChange={(v) => upd('is_winning_pitcher', v)}
             />
             <Toggle label="セーブ" checked={form.has_save} onChange={(v) => upd('has_save', v)} />
-          </div>
-        </Field>
-
-        <Field label="その他ボーナス" hint="珍記録など">
-          <div className="flex flex-col gap-2">
-            <input
-              type="text"
-              value={form.other_note}
-              onChange={(e) => upd('other_note', e.target.value)}
-              placeholder="例: 代打逆転満塁ホームラン"
-              className={inputClass}
-            />
-            <div className="grid grid-cols-4 gap-2">
-              {[0, 100, 500, 1000].map((amount) => (
-                <Chip
-                  key={amount}
-                  selected={otherAmount === amount}
-                  onClick={() => upd('other_amount', String(amount))}
-                >
-                  {amount === 0 ? 'なし' : `¥${amount}`}
-                </Chip>
-              ))}
-            </div>
           </div>
         </Field>
 

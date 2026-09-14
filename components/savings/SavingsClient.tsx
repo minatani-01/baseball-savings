@@ -611,7 +611,7 @@ export default function SavingsClient({
         <GameSheet entry={editing} rules={rules} userId={userId} onClose={closeSheet} />
       ) : null}
       {sheetMode === 'custom' ? (
-        <CustomSavingSheet entry={editing} userId={userId} onClose={closeSheet} />
+        <CustomSavingSheet entry={editing} rules={rules} userId={userId} onClose={closeSheet} />
       ) : null}
     </div>
   )

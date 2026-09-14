@@ -5,23 +5,42 @@ import { useRouter } from 'next/navigation'
 import { Amount, Button, Chip, Field, Sheet, inputClass } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { today } from '@/lib/format'
-import type { SavingEntryRow } from '@/types'
+import type { SavingEntryRow, SavingRules } from '@/types'
 
 const QUICK_AMOUNTS = [300, 500, 1000, 3000]
 
 /**
- * カスタム登録（試合結果から自動計算できない分を任意額で積み立てる）。
+ * カスタム登録（試合結果から自動計算できない分を積み立てる）。
  * saving_entries に kind='custom' / game_id=null で保存する。
  *
- * NPB 公式は1試合ごとの個人打撃成績を公開していないため、
- * マルチ安打と打点は自動登録では扱わず、ここで登録する。
+ * NPB 公式から取得できない項目はここで登録する。
+ * 定型をタップすると、貯金ルールの単価が内容と金額に入る。
+ * 珍記録のように決まった単価が無いものは、そのまま手で入力する。
  */
+
+/**
+ * 自動登録では扱えない定型。
+ *
+ * サヨナラ勝利      イニングスコアから推定はできるが、公式に項目が無い
+ * ノーヒットノーラン 個人投手成績に該当する列が無い
+ * 完全試合          同上
+ *
+ * （docs/npb-data-sources.md 3章）
+ */
+const PRESETS: { key: string; label: string; ruleKey: keyof SavingRules }[] = [
+  { key: 'sayonara', label: 'サヨナラ勝利', ruleKey: 'sayonara_bonus' },
+  { key: 'no_hitter', label: 'ノーヒットノーラン', ruleKey: 'no_hitter_amount' },
+  { key: 'perfect_game', label: '完全試合', ruleKey: 'perfect_game_amount' },
+]
+
 export default function CustomSavingSheet({
   entry,
+  rules,
   userId,
   onClose,
 }: {
   entry: SavingEntryRow | null
+  rules: SavingRules
   userId: string
   onClose: () => void
 }) {
@@ -35,6 +54,12 @@ export default function CustomSavingSheet({
 
   const parsedAmount = Math.max(0, Number.parseInt(amount || '0', 10) || 0)
   const canSubmit = title.trim().length > 0 && parsedAmount > 0 && Boolean(date)
+
+  /** 定型をタップしたら、内容と金額をその場で埋める（どちらも後から直せる） */
+  const applyPreset = (preset: (typeof PRESETS)[number]) => {
+    setTitle(preset.label)
+    setAmount(String(Number(rules[preset.ruleKey])))
+  }
 
   const save = async () => {
     if (!canSubmit) return
@@ -90,12 +115,27 @@ export default function CustomSavingSheet({
           />
         </Field>
 
-        <Field label="内容">
+        <Field label="定型" hint="NPBから取得できないため、ここで積み立てます">
+          <div className="grid grid-cols-3 gap-2">
+            {PRESETS.map((preset) => (
+              <Chip
+                key={preset.key}
+                selected={title === preset.label}
+                onClick={() => applyPreset(preset)}
+                sub={`¥${Number(rules[preset.ruleKey]).toLocaleString()}`}
+              >
+                {preset.label}
+              </Chip>
+            ))}
+          </div>
+        </Field>
+
+        <Field label="内容" hint="定型を選ぶと入ります。珍記録などは直接書いてください">
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="例: マルチ安打 2人 / 打点 3"
+            placeholder="例: 代打逆転満塁ホームラン"
             className={inputClass}
           />
         </Field>
@@ -137,7 +177,7 @@ export default function CustomSavingSheet({
             <Amount value={parsedAmount} size="lg" tone="marine" />
           </div>
           <p className="mt-2 text-[11px] text-fg-mute">
-            カスタム登録にはフェーズ倍率も貯金ルールも適用されません。
+            カスタム登録にフェーズ倍率は適用されません。
           </p>
         </div>
       </div>

@@ -25,10 +25,8 @@ type MultiplierKey =
 const AMOUNT_SECTIONS: { title: string; note?: string; items: { key: AmountKey; label: string }[] }[] = [
   {
     title: '試合結果',
-    note: 'サヨナラ勝利は勝利に加算されます',
     items: [
       { key: 'win_amount', label: '勝利' },
-      { key: 'sayonara_bonus', label: 'サヨナラ勝利（加算）' },
       { key: 'draw_amount', label: '引き分け' },
       { key: 'lose_amount', label: '敗北' },
     ],
@@ -47,13 +45,21 @@ const AMOUNT_SECTIONS: { title: string; note?: string; items: { key: AmountKey; 
     title: '投手',
     note: '先発ハイライトは最上位のみ加算、セーブは独立して加算されます',
     items: [
-      { key: 'perfect_game_amount', label: '完全試合' },
-      { key: 'no_hitter_amount', label: 'ノーヒットノーラン' },
       { key: 'shutout_amount', label: '完封' },
       { key: 'complete_game_amount', label: '完投' },
-      { key: 'quality_start_amount', label: 'QS' },
       { key: 'winning_pitcher_amount', label: '勝利投手' },
       { key: 'save_amount', label: 'セーブ' },
+    ],
+  },
+  {
+    // NPB 公式から取得できないため、自動登録では扱わない項目。
+    // カスタム登録で定型として選ぶと、ここの単価が入る。
+    title: 'カスタム登録',
+    note: 'NPBから取得できないため、カスタム登録の定型として使います',
+    items: [
+      { key: 'sayonara_bonus', label: 'サヨナラ勝利' },
+      { key: 'no_hitter_amount', label: 'ノーヒットノーラン' },
+      { key: 'perfect_game_amount', label: '完全試合' },
     ],
   },
 ]

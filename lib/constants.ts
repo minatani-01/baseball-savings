@@ -64,7 +64,11 @@ export const HOME_AWAY: { id: HomeAway; label: string }[] = [
   { id: 'away', label: 'ビジター' },
 ]
 
-/** 先発ハイライトは最上位のみ加算する（セーブのみ独立） */
+/**
+ * 先発ハイライトは最上位のみ加算する（セーブのみ独立）。
+ *
+ * 表示用の全一覧。過去の記録のラベルを引くのに使う。
+ */
 export const PITCHING_HIGHLIGHTS: { id: PitchingHighlight; label: string }[] = [
   { id: 'none', label: 'なし' },
   { id: 'quality_start', label: 'QS' },
@@ -73,6 +77,25 @@ export const PITCHING_HIGHLIGHTS: { id: PitchingHighlight; label: string }[] = [
   { id: 'no_hitter', label: 'ノーヒットノーラン' },
   { id: 'perfect_game', label: '完全試合' },
 ]
+
+/**
+ * 自動登録で選べる先発ハイライト。
+ *
+ * 完投と完封は NPB の個人投手成績に「完投」「完封勝」の列があり、
+ * その累計差分から求められる。
+ *
+ * 除いているもの:
+ *   QS               累計差分から求められるが、貯金の対象にしない
+ *   ノーヒットノーラン 該当する列が無い。「完投+1 かつ安打の増分が0」で
+ *   完全試合          導出はできるが、スナップショットを1日取りこぼすと
+ *                    判定が崩れる。年に数回あるかないかの記録のために
+ *                    壊れやすい推定は入れず、カスタム登録で積み立てる
+ *                    （docs/npb-data-sources.md 3章）
+ */
+const NOT_AUTO_HIGHLIGHTS: PitchingHighlight[] = ['quality_start', 'no_hitter', 'perfect_game']
+
+export const AUTO_PITCHING_HIGHLIGHTS: { id: PitchingHighlight; label: string }[] =
+  PITCHING_HIGHLIGHTS.filter((p) => !NOT_AUTO_HIGHLIGHTS.includes(p.id))
 
 export function pitchingHighlightLabel(id: PitchingHighlight): string {
   return PITCHING_HIGHLIGHTS.find((p) => p.id === id)?.label ?? id
