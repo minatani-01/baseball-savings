@@ -31,7 +31,7 @@ import GameSheet from '@/components/savings/GameSheet'
 import CustomSavingSheet from '@/components/savings/CustomSavingSheet'
 import { createClient } from '@/lib/supabase/client'
 import { BREAKDOWN_GROUP_LABEL, calcSaving, groupBreakdown } from '@/lib/savings'
-import { depositedTotal, goalProgress, monthOverMonth, notDepositedTotal } from '@/lib/insights'
+import { depositedTotal, monthOverMonth, notDepositedTotal } from '@/lib/insights'
 import { currentMonth, monthLabel, monthLabelEn, shortDate, yen } from '@/lib/format'
 import {
   MONTHLY_STATUS_LABEL,
@@ -140,16 +140,6 @@ export default function SavingsClient({
     () => monthUnregistered.reduce((sum, g) => sum + calcSaving(g, rules).amount, 0),
     [monthUnregistered, rules]
   )
-
-  // 目標は年単位。進捗は「その年の入金済みの月」の合計で見る。
-  // 累計貯金額と同じ定義にそろえる（基準が2つあると、同じ画面の中で
-  // どちらが本当なのか読めなくなる）
-  const year = month.slice(0, 4)
-  const yearDeposited = useMemo(
-    () => depositedTotal(monthlySavings.filter((m) => m.month.startsWith(`${year}-`))),
-    [monthlySavings, year]
-  )
-  const goal = goalProgress(yearDeposited, rules.annual_goal_amount)
 
   const groups = useMemo(() => {
     const totals: Record<string, number> = { result: 0, batting: 0, pitching: 0, other: 0 }
@@ -367,17 +357,6 @@ export default function SavingsClient({
             </div>
             <StatusPill tone={STATUS_TONE[status]}>{MONTHLY_STATUS_LABEL[status]}</StatusPill>
           </div>
-
-          {goal.percent !== null ? (
-            <div className="mt-4 border-t border-line pt-4">
-              <ProgressBar
-                value={goal.current}
-                max={goal.goal}
-                label={`${year}年の目標`}
-                caption={`${yen(goal.current)} / ${yen(goal.goal)}`}
-              />
-            </div>
-          ) : null}
 
           {monthEntries.length > 0 ? (
             <div className="mt-4 divide-hairline border-t border-line pt-1">

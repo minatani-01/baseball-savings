@@ -14,7 +14,6 @@ type AmountKey = Exclude<
   | 'multiplier_interleague'
   | 'multiplier_cs'
   | 'multiplier_nippon_series'
-  | 'annual_goal_amount'
 >
 
 type MultiplierKey =
@@ -165,43 +164,6 @@ export default function RulesClient({
           </Card>
         </div>
       ))}
-
-      <div>
-        <SectionLabel>年間の目標金額</SectionLabel>
-        <Card>
-          <p className="mb-3 text-[11px] text-fg-mute">
-            1年間（1月〜12月）でいくら貯めるかを決めます。貯金タブに進捗バーを、
-            ホームに目標額を表示します。進捗は月末に確定した金額で数えます。
-            0 にすると進捗バーは非表示になります。
-          </p>
-          <div className="flex items-center justify-between gap-4 py-1">
-            <label htmlFor="annual_goal_amount" className="text-[13px] text-fg-dim">
-              年間の目標金額
-            </label>
-            <div className="flex items-center gap-1.5">
-              <span className="text-fg-mute">¥</span>
-              <input
-                id="annual_goal_amount"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                step={10000}
-                value={rules.annual_goal_amount}
-                onChange={(e) => {
-                  const parsed = Number.parseInt(e.target.value, 10)
-                  setRules((prev) => ({
-                    ...prev,
-                    annual_goal_amount: Number.isFinite(parsed) && parsed >= 0 ? parsed : 0,
-                  }))
-                  setSaved(false)
-                }}
-                disabled={!canEdit}
-                className={numberInput}
-              />
-            </div>
-          </div>
-        </Card>
-      </div>
 
       <div>
         <SectionLabel>フェーズ倍率</SectionLabel>

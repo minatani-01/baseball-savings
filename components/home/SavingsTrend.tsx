@@ -31,7 +31,7 @@ export default function SavingsTrend({
       <PillTabs
         value={unit}
         options={[
-          { id: 'month', label: `${year}年の月別` },
+          { id: 'month', label: '月別' },
           { id: 'year', label: '年別' },
         ]}
         onChange={setUnit}
