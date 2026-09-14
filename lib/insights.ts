@@ -81,42 +81,52 @@ export function recordMonth(date: string): string {
 /**
  * 「累計貯金額」の定義（アプリ全体で唯一の定義）。
  *
- * 月末に「確定」した月だけを数える。今月のようにまだ確定していない月は含めない。
- * 画面ごとに entries を素朴に合計すると、確定前の今月分が混ざって数字がずれるため、
+ * ワンバンクへ入金した月だけを数える。月末に「確定」しただけの月は、
+ * 金額が決まっただけで手元からはまだ動いていないので、累計には入れない。
+ * 画面ごとに entries を素朴に合計すると確定前の月が混ざって数字がずれるため、
  * 累計を出すところは必ずこの関数を通す。
  */
-export function confirmedMonthSet(monthlySavings: MonthlySaving[]): Set<string> {
+export function depositedMonthSet(monthlySavings: MonthlySaving[]): Set<string> {
   return new Set(
     monthlySavings
-      .filter(
-        (m) =>
-          m.confirmed_amount !== null &&
-          (m.status === 'ready' || m.status === 'deposited')
-      )
+      .filter((m) => m.status === 'deposited' && m.confirmed_amount !== null)
       .map((m) => m.month)
   )
 }
 
-/** 確定した月だけの積立合計 */
-export function confirmedTotal(monthlySavings: MonthlySaving[]): number {
+/** 入金済みの月だけの積立合計 */
+export function depositedTotal(monthlySavings: MonthlySaving[]): number {
   return monthlySavings
-    .filter(
-      (m) =>
-        m.confirmed_amount !== null &&
-        (m.status === 'ready' || m.status === 'deposited')
-    )
+    .filter((m) => m.status === 'deposited' && m.confirmed_amount !== null)
     .reduce((sum, m) => sum + (m.confirmed_amount ?? 0), 0)
 }
 
-/** まだ確定していない月の積立合計（見込み。累計には足さない） */
-export function pendingTotal(
+/**
+ * まだ入金していない分。
+ *
+ * 確定済み（ready）の月は確定額で、確定前の月は積立予定額で数える。
+ * 確定した月を積立予定額で数え直すと、月末に金額を締めた意味が無くなるため。
+ */
+export function notDepositedTotal(
   entries: { month: string; amount: number }[],
   monthlySavings: MonthlySaving[]
 ): number {
-  const confirmed = confirmedMonthSet(monthlySavings)
-  return entries
-    .filter((e) => !confirmed.has(e.month))
+  const readyTotal = monthlySavings
+    .filter((m) => m.status === 'ready' && m.confirmed_amount !== null)
+    .reduce((sum, m) => sum + (m.confirmed_amount ?? 0), 0)
+
+  const settled = new Set(
+    monthlySavings
+      .filter(
+        (m) => m.confirmed_amount !== null && (m.status === 'ready' || m.status === 'deposited')
+      )
+      .map((m) => m.month)
+  )
+  const notSettled = entries
+    .filter((e) => !settled.has(e.month))
     .reduce((sum, e) => sum + e.amount, 0)
+
+  return readyTotal + notSettled
 }
 
 /**

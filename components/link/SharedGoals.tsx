@@ -24,7 +24,7 @@ import type { MarineLinkView, SharedGoalView } from '@/types'
  *   Account A ¥28,500 / Account B ¥31,200
  *   TOTAL ¥59,700 (59.7%)
  *
- * 達成率は「月末に確定した月次金額」の合計で見る。今月のように未確定の月は
+ * 達成率は「ワンバンクへ入金した月次金額」の合計で見る。確定しただけの月は
  * 見込みとして別に出し、合計には足さない。資金は各自のワンバンクのままで、
  * ここで管理するのは記録上の共同目標だけ（仕様書16章・17章）。
  */
@@ -198,7 +198,7 @@ export default function SharedGoals({
               </div>
 
               <p className="mt-3 text-[11px] leading-relaxed text-fg-mute">
-                達成率は月末に確定した金額の合計です（今月など未確定の月は含みません）。
+                達成率はワンバンクへ入金した金額の合計です（確定しただけの月は含みません）。
                 入金はそれぞれ自分のワンバンクへ行います。
               </p>
             </Card>

@@ -17,7 +17,7 @@ import {
   getSavingCircleTotals,
   getSplitRecords,
 } from '@/lib/queries'
-import { confirmedTotal, formatWinRate, monthOverMonth, seasonRecord, streakDays } from '@/lib/insights'
+import { depositedTotal, formatWinRate, monthOverMonth, seasonRecord, streakDays } from '@/lib/insights'
 import { currentMonth, isMonthClosed, monthLabel, shortDate, today, yen } from '@/lib/format'
 import { MONTHLY_STATUS_LABEL, opponentLabel, resultLabel } from '@/lib/constants'
 import type { ExpenseCategory, MonthlyStatus } from '@/types'
@@ -52,9 +52,9 @@ export default async function HomePage() {
   ])
 
   const month = currentMonth()
-  // 累計貯金額は「月末に確定した月次金額」の合計。今月のように未確定の月は含めない。
-  // 定義は lib/insights.ts の confirmedTotal に集約してあり、貯金・履歴と同じ値になる
-  const myTotal = confirmedTotal(monthlySavings)
+  // 累計貯金額は「ワンバンクへ入金した月」の合計。確定しただけの月は含めない。
+  // 定義は lib/insights.ts の depositedTotal に集約してあり、貯金・履歴と同じ値になる
+  const myTotal = depositedTotal(monthlySavings)
   // 総累計は自分の分を myTotal で置き換えて、1人分の表示と必ず一致させる
   const circleTotal =
     myTotal + circle.filter((row) => !row.is_self).reduce((sum, row) => sum + row.confirmed, 0)
@@ -140,7 +140,7 @@ export default async function HomePage() {
           <DeltaBadge percent={delta} />
         </div>
         <div className="mt-1 text-[11px] text-fg-mute">
-          1人分 / 月末に確定した金額の合計（今月分は含みません）
+          1人分 / ワンバンクへ入金した金額の合計
         </div>
 
         {circleSize > 1 ? (

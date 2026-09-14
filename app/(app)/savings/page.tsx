@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import SavingsClient from '@/components/savings/SavingsClient'
 import {
   getMonthlySavings,
+  getProfile,
   getSavingEntries,
   getSavingRules,
   getSessionUser,
@@ -12,11 +13,12 @@ export default async function SavingsPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const [entries, monthlySavings, rules, goals] = await Promise.all([
+  const [entries, monthlySavings, rules, goals, profile] = await Promise.all([
     getSavingEntries(user.id),
     getMonthlySavings(user.id),
     getSavingRules(user.id),
     getSharedGoals(),
+    getProfile(user.id),
   ])
 
   return (
@@ -26,6 +28,7 @@ export default async function SavingsPage() {
       monthlySavings={monthlySavings}
       rules={rules}
       goals={goals}
+      isMaster={profile?.is_master ?? false}
     />
   )
 }

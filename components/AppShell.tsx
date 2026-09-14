@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import Brand from '@/components/Brand'
 import {
   IconArrowLeft,
   IconBell,
   IconClock,
   IconHome,
+  IconRefresh,
   IconUser,
   IconUsers,
   IconWallet,
@@ -42,6 +43,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const header = HEADERS[pathname]
+  const [reloading, setReloading] = useState(false)
+
+  /**
+   * 更新。
+   *
+   * router.refresh() だとサーバーから取り直すのはデータだけで、
+   * 配信されているアプリ自体は古いままになる。Marine Link の接続状況のような
+   * 相手側の変化も、新しいビルドの取得も、まとめて拾えるように読み込み直す。
+   */
+  const reload = () => {
+    setReloading(true)
+    window.location.reload()
+  }
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col">
@@ -57,7 +71,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
               >
                 <IconArrowLeft size={20} />
               </button>
-            ) : null}
+            ) : (
+              // 戻る矢印が無い画面（各タブの先頭）では、同じ場所を更新に使う
+              <button
+                type="button"
+                onClick={reload}
+                disabled={reloading}
+                aria-label="更新"
+                title="アプリとデータを最新にする"
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-fg-dim transition-colors hover:text-marine disabled:opacity-50"
+              >
+                <IconRefresh size={19} className={reloading ? 'animate-spin' : undefined} />
+              </button>
+            )}
           </div>
 
           <div className="flex min-w-0 justify-center overflow-hidden">
