@@ -45,6 +45,7 @@ import type {
   MonthlyStatus,
   Game,
   SavingEntryRow,
+  SavingCustomPreset,
   SavingRules,
   SharedGoalView,
 } from '@/types'
@@ -62,6 +63,7 @@ export default function SavingsClient({
   entries,
   monthlySavings,
   rules,
+  presets,
   goals,
   isMaster,
   games,
@@ -70,6 +72,8 @@ export default function SavingsClient({
   entries: SavingEntryRow[]
   monthlySavings: MonthlySaving[]
   rules: SavingRules
+  /** カスタム登録の定型。貯金ルールの画面で増やせる */
+  presets: SavingCustomPreset[]
   /** 共同貯金（仕様書17章はロッテ貯金内の機能と定めている） */
   goals: SharedGoalView[]
   /** マスター権限。確定が共有先にも反映される */
@@ -611,7 +615,7 @@ export default function SavingsClient({
         <GameSheet entry={editing} rules={rules} userId={userId} onClose={closeSheet} />
       ) : null}
       {sheetMode === 'custom' ? (
-        <CustomSavingSheet entry={editing} rules={rules} userId={userId} onClose={closeSheet} />
+        <CustomSavingSheet entry={editing} presets={presets} userId={userId} onClose={closeSheet} />
       ) : null}
     </div>
   )

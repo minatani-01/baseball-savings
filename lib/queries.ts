@@ -13,6 +13,7 @@ import type {
   MonthlySaving,
   Profile,
   SavingEntryRow,
+  SavingCustomPreset,
   SavingRules,
   SavingCircleTotal,
   SharedGoalMemberProgress,
@@ -185,6 +186,21 @@ export async function getSavingRules(): Promise<SavingRules> {
     multiplier_cs: Number(data.multiplier_cs),
     multiplier_nippon_series: Number(data.multiplier_nippon_series),
   }
+}
+
+/**
+ * カスタム登録の定型。全アカウント共通で、貯金ルールの画面から増やせる。
+ */
+export async function getSavingCustomPresets(): Promise<SavingCustomPreset[]> {
+  const supabase = await createClient()
+  const data = await read<SavingCustomPreset[]>('saving_custom_presets', () =>
+    supabase
+      .from('saving_custom_presets')
+      .select('id, label, amount, sort_order')
+      .order('sort_order', { ascending: true })
+      .order('label', { ascending: true })
+  )
+  return data ?? []
 }
 
 /**

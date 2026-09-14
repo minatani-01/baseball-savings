@@ -116,6 +116,20 @@ export type SavingRules = {
   multiplier_nippon_series: number
 }
 
+/**
+ * カスタム登録の「定型」。
+ *
+ * NPB から取得できない記録は人によって増えるので、
+ * アプリに直書きせず行として持ち、貯金ルールの画面から増やせるようにする。
+ * 貯金ルールと同じく全アカウント共通。
+ */
+export type SavingCustomPreset = {
+  id: string
+  label: string
+  amount: number
+  sort_order: number
+}
+
 /** 月末フロー。入金はワンバンク側で一度に終わるので中間状態は持たない */
 export type MonthlyStatus = 'calculating' | 'ready' | 'deposited'
 

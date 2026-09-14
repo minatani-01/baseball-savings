@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Amount, Button, Chip, Field, Sheet, inputClassCompact } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { today } from '@/lib/format'
-import type { SavingEntryRow, SavingRules } from '@/types'
+import type { SavingCustomPreset, SavingEntryRow } from '@/types'
 
 const QUICK_AMOUNTS = [300, 500, 1000, 3000]
 
@@ -14,33 +14,19 @@ const QUICK_AMOUNTS = [300, 500, 1000, 3000]
  * saving_entries に kind='custom' / game_id=null で保存する。
  *
  * NPB 公式から取得できない項目はここで登録する。
- * 定型をタップすると、貯金ルールの単価が内容と金額に入る。
- * 珍記録のように決まった単価が無いものは、そのまま手で入力する。
+ * 定型を選ぶと、その名前と金額が入る。定型は貯金ルールの画面で増やせる。
+ * 珍記録のように決まった金額が無いものは、そのまま手で入力する。
  */
-
-/**
- * 自動登録では扱えない定型。
- *
- * サヨナラ勝利      イニングスコアから推定はできるが、公式に項目が無い
- * ノーヒットノーラン 個人投手成績に該当する列が無い
- * 完全試合          同上
- *
- * （docs/npb-data-sources.md 3章）
- */
-const PRESETS: { key: string; label: string; ruleKey: keyof SavingRules }[] = [
-  { key: 'sayonara', label: 'サヨナラ勝利', ruleKey: 'sayonara_bonus' },
-  { key: 'no_hitter', label: 'ノーヒットノーラン', ruleKey: 'no_hitter_amount' },
-  { key: 'perfect_game', label: '完全試合', ruleKey: 'perfect_game_amount' },
-]
 
 export default function CustomSavingSheet({
   entry,
-  rules,
+  presets,
   userId,
   onClose,
 }: {
   entry: SavingEntryRow | null
-  rules: SavingRules
+  /** 貯金ルールの画面で増やせる定型 */
+  presets: SavingCustomPreset[]
   userId: string
   onClose: () => void
 }) {
@@ -55,10 +41,10 @@ export default function CustomSavingSheet({
   const parsedAmount = Math.max(0, Number.parseInt(amount || '0', 10) || 0)
   const canSubmit = title.trim().length > 0 && parsedAmount > 0 && Boolean(date)
 
-  /** 定型をタップしたら、内容と金額をその場で埋める（どちらも後から直せる） */
-  const applyPreset = (preset: (typeof PRESETS)[number]) => {
+  /** 定型を選んだら、その他と金額をその場で埋める（どちらも後から直せる） */
+  const applyPreset = (preset: SavingCustomPreset) => {
     setTitle(preset.label)
-    setAmount(String(Number(rules[preset.ruleKey])))
+    setAmount(String(preset.amount))
   }
 
   const save = async () => {
@@ -116,19 +102,22 @@ export default function CustomSavingSheet({
             />
           </Field>
 
-          <Field label="定型" hint="NPB対象外">
+          <Field label="定型" hint="貯金ルールで追加">
             <select
-              value={PRESETS.find((p) => p.label === title)?.key ?? ''}
+              value={presets.find((p) => p.label === title)?.id ?? ''}
               onChange={(e) => {
-                const preset = PRESETS.find((p) => p.key === e.target.value)
+                const preset = presets.find((p) => p.id === e.target.value)
                 if (preset) applyPreset(preset)
               }}
               className={inputClassCompact}
+              disabled={presets.length === 0}
             >
-              <option value="">選択しない</option>
-              {PRESETS.map((preset) => (
-                <option key={preset.key} value={preset.key}>
-                  {preset.label}　¥{Number(rules[preset.ruleKey]).toLocaleString()}
+              <option value="">
+                {presets.length === 0 ? '定型がありません' : '選択しない'}
+              </option>
+              {presets.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}　¥{preset.amount.toLocaleString()}
                 </option>
               ))}
             </select>
