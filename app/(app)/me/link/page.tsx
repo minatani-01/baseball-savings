@@ -27,6 +27,7 @@ export default async function MarineLinkPage() {
     <LinkClient
       userId={user.id}
       marineId={profile?.marine_id ?? ''}
+      isMaster={profile?.is_master ?? false}
       initialLinks={links}
       month={month}
       myMonthTotal={myMonthTotal}

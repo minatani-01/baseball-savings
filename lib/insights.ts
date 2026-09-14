@@ -81,40 +81,105 @@ export function recordMonth(date: string): string {
 /**
  * 「累計貯金額」の定義（アプリ全体で唯一の定義）。
  *
- * 月末に「確定」した月だけを数える。今月のようにまだ確定していない月は含めない。
- * 画面ごとに entries を素朴に合計すると、確定前の今月分が混ざって数字がずれるため、
+ * ワンバンクへ入金した月だけを数える。月末に「確定」しただけの月は、
+ * 金額が決まっただけで手元からはまだ動いていないので、累計には入れない。
+ * 画面ごとに entries を素朴に合計すると確定前の月が混ざって数字がずれるため、
  * 累計を出すところは必ずこの関数を通す。
  */
-export function confirmedMonthSet(monthlySavings: MonthlySaving[]): Set<string> {
+export function depositedMonthSet(monthlySavings: MonthlySaving[]): Set<string> {
   return new Set(
     monthlySavings
-      .filter(
-        (m) =>
-          m.confirmed_amount !== null &&
-          (m.status === 'ready' || m.status === 'deposited')
-      )
+      .filter((m) => m.status === 'deposited' && m.confirmed_amount !== null)
       .map((m) => m.month)
   )
 }
 
-/** 確定した月だけの積立合計 */
-export function confirmedTotal(monthlySavings: MonthlySaving[]): number {
+/** 入金済みの月だけの積立合計 */
+export function depositedTotal(monthlySavings: MonthlySaving[]): number {
   return monthlySavings
-    .filter(
-      (m) =>
-        m.confirmed_amount !== null &&
-        (m.status === 'ready' || m.status === 'deposited')
-    )
+    .filter((m) => m.status === 'deposited' && m.confirmed_amount !== null)
     .reduce((sum, m) => sum + (m.confirmed_amount ?? 0), 0)
 }
 
-/** まだ確定していない月の積立合計（見込み。累計には足さない） */
-export function pendingTotal(
+/**
+ * まだ入金していない分。
+ *
+ * 確定済み（ready）の月は確定額で、確定前の月は積立予定額で数える。
+ * 確定した月を積立予定額で数え直すと、月末に金額を締めた意味が無くなるため。
+ */
+export function notDepositedTotal(
   entries: { month: string; amount: number }[],
   monthlySavings: MonthlySaving[]
 ): number {
-  const confirmed = confirmedMonthSet(monthlySavings)
-  return entries
-    .filter((e) => !confirmed.has(e.month))
+  const readyTotal = monthlySavings
+    .filter((m) => m.status === 'ready' && m.confirmed_amount !== null)
+    .reduce((sum, m) => sum + (m.confirmed_amount ?? 0), 0)
+
+  const settled = new Set(
+    monthlySavings
+      .filter(
+        (m) => m.confirmed_amount !== null && (m.status === 'ready' || m.status === 'deposited')
+      )
+      .map((m) => m.month)
+  )
+  const notSettled = entries
+    .filter((e) => !settled.has(e.month))
     .reduce((sum, e) => sum + e.amount, 0)
+
+  return readyTotal + notSettled
+}
+
+/**
+ * 今季の戦績。
+ *
+ * 貯金の記録（saving_entries）に紐づく試合から数える。
+ * このアプリは全試合を貯金の対象にするため、記録＝その年の試合そのものになる
+ * （本番DBで 2026年の試合116件と試合貯金116行が1対1であることを確認済み）。
+ * games を別に引かずに済むぶん、ホームのクエリを増やさない。
+ *
+ * 勝率は引き分けを除いて 勝 ÷（勝＋負）。NPBの表記に合わせて小数第3位まで持つ。
+ * 記録が最後に入った日も返す。登録は試合のあとなので、
+ * 「いつ時点の成績か」を画面に出せるようにしておく。
+ */
+export type SeasonRecord = {
+  win: number
+  lose: number
+  draw: number
+  /** 勝率。勝敗が1つもない場合は null（0.000 と区別する） */
+  rate: number | null
+  /** 最後に記録した試合の日付（'YYYY-MM-DD'）。1件も無ければ null */
+  lastGameDate: string | null
+}
+
+export function seasonRecord(entries: SavingEntryRow[], year: number): SeasonRecord {
+  const games = entries
+    .map((e) => e.game)
+    .filter((g): g is NonNullable<typeof g> => Boolean(g) && g!.game_date.startsWith(`${year}-`))
+
+  let win = 0
+  let lose = 0
+  let draw = 0
+  let lastGameDate: string | null = null
+
+  for (const game of games) {
+    if (game.result === 'win') win += 1
+    else if (game.result === 'lose') lose += 1
+    else if (game.result === 'draw') draw += 1
+    if (!lastGameDate || game.game_date > lastGameDate) lastGameDate = game.game_date
+  }
+
+  const decided = win + lose
+  return {
+    win,
+    lose,
+    draw,
+    rate: decided === 0 ? null : Math.round((win / decided) * 1000) / 1000,
+    lastGameDate,
+  }
+}
+
+/** 勝率を .469 の形にする。比較できないときは '---' */
+export function formatWinRate(rate: number | null): string {
+  if (rate === null) return '---'
+  return rate.toFixed(3).replace(/^0/, '')
 }

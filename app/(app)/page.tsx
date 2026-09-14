@@ -17,8 +17,8 @@ import {
   getSavingCircleTotals,
   getSplitRecords,
 } from '@/lib/queries'
-import { confirmedTotal, monthOverMonth, streakDays } from '@/lib/insights'
-import { currentMonth, isMonthClosed, monthLabel, shortDate, yen } from '@/lib/format'
+import { depositedTotal, formatWinRate, monthOverMonth, seasonRecord, streakDays } from '@/lib/insights'
+import { currentMonth, isMonthClosed, monthLabel, shortDate, today, yen } from '@/lib/format'
 import { MONTHLY_STATUS_LABEL, opponentLabel, resultLabel } from '@/lib/constants'
 import type { ExpenseCategory, MonthlyStatus } from '@/types'
 
@@ -52,9 +52,9 @@ export default async function HomePage() {
   ])
 
   const month = currentMonth()
-  // 累計貯金額は「月末に確定した月次金額」の合計。今月のように未確定の月は含めない。
-  // 定義は lib/insights.ts の confirmedTotal に集約してあり、貯金・履歴と同じ値になる
-  const myTotal = confirmedTotal(monthlySavings)
+  // 累計貯金額は「ワンバンクへ入金した月」の合計。確定しただけの月は含めない。
+  // 定義は lib/insights.ts の depositedTotal に集約してあり、貯金・履歴と同じ値になる
+  const myTotal = depositedTotal(monthlySavings)
   // 総累計は自分の分を myTotal で置き換えて、1人分の表示と必ず一致させる
   const circleTotal =
     myTotal + circle.filter((row) => !row.is_self).reduce((sum, row) => sum + row.confirmed, 0)
@@ -66,8 +66,8 @@ export default async function HomePage() {
   const delta = monthOverMonth(entries, month)
   const streak = streakDays(entries)
 
-  const monthly = monthlySavings.find((m) => m.month === month) ?? null
-  const status: MonthlyStatus = monthly?.status ?? 'calculating'
+  // 今季の戦績。貯金の記録に紐づく試合から数える（記録＝その年の試合そのもの）
+  const record = seasonRecord(entries, Number(today().slice(0, 4)))
 
   // 締めが終わっているのに入金まで進んでいない月をホームで先に促す
   // 締めが終わった月のうち、まだワンバンクへ入金していないもの。
@@ -140,7 +140,7 @@ export default async function HomePage() {
           <DeltaBadge percent={delta} />
         </div>
         <div className="mt-1 text-[11px] text-fg-mute">
-          1人分 / 月末に確定した金額の合計（今月分は含みません）
+          1人分 / ワンバンクへ入金した金額の合計
         </div>
 
         {circleSize > 1 ? (
@@ -159,9 +159,9 @@ export default async function HomePage() {
             <div className="tnum mt-1 text-lg font-semibold">{yen(monthTotal)}</div>
           </div>
           <div>
-            <div className="text-[10px] tracking-wider text-fg-mute">目標金額</div>
+            <div className="text-[10px] tracking-wider text-fg-mute">年間目標</div>
             <div className="tnum mt-1 text-lg font-semibold text-marine">
-              {rules.monthly_goal_amount > 0 ? yen(rules.monthly_goal_amount) : '未設定'}
+              {rules.annual_goal_amount > 0 ? yen(rules.annual_goal_amount) : '未設定'}
             </div>
           </div>
           <div>
@@ -185,7 +185,8 @@ export default async function HomePage() {
           <IconChevronRight size={18} />
         </Link>
         <Link
-          href="/split"
+          // 「作成」なので、割り勘タブを開くだけでなく登録シートまで開く
+          href="/split?new=1"
           prefetch={false}
           className="glass flex min-h-[54px] items-center justify-between gap-3 rounded-2xl px-4 transition-colors hover:border-marine/50"
         >
@@ -207,11 +208,19 @@ export default async function HomePage() {
           <div className="mt-1 text-[11px] text-fg-mute">{unpaid.length}件</div>
         </Card>
         <Card>
-          <div className="text-[10px] tracking-wider text-fg-mute">今月の試合</div>
-          <div className="tnum mt-1.5 text-xl font-semibold">
-            {monthEntries.filter((e) => e.game).length} Games
+          {/* 試合数ではなく戦績を出す。登録は試合のあとになるので、
+              「何試合ぶん記録したか」より「今季どうだったか」の方が読む意味がある。
+              どこまでの結果かが分かるよう、最後に記録した試合の日付を添える */}
+          <div className="text-[10px] tracking-wider text-fg-mute">今季の勝率</div>
+          <div className="tnum mt-1.5 text-xl font-semibold">{formatWinRate(record.rate)}</div>
+          <div className="tnum mt-1 text-[11px] text-fg-mute">
+            {record.win}勝{record.lose}敗{record.draw}分
           </div>
-          <div className="mt-1 text-[11px] text-fg-mute">{MONTHLY_STATUS_LABEL[status]}</div>
+          {record.lastGameDate ? (
+            <div className="tnum mt-0.5 text-[11px] text-fg-mute">
+              {shortDate(record.lastGameDate)}まで
+            </div>
+          ) : null}
         </Card>
       </div>
 

@@ -23,12 +23,15 @@ export default function MeClient({
   email,
   initialProfile,
   avatarUrl,
+  signInMethod,
 }: {
   userId: string
   email: string
   initialProfile: Profile | null
   /** プロフィールアイコンの署名付きURL。未設定・発行失敗のときは null */
   avatarUrl: string | null
+  /** ログインに使っている方法の表示名（'Google' / 'メールアドレス'） */
+  signInMethod: string
 }) {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(initialProfile)
@@ -223,7 +226,9 @@ export default function MeClient({
           ) : null}
 
           <div className="divide-hairline border-t border-line pt-4">
-            <Row label="メールアドレス" value={email} />
+            {/* Google で入っているなら「Google」と出す。
+                どのアカウントで入っているかが分かるよう、値はメールアドレスのまま */}
+            <Row label={signInMethod} value={email} />
           </div>
           <div className="mt-4 border-t border-line pt-4">
             <Field label="表示名">
@@ -273,41 +278,46 @@ export default function MeClient({
         </Card>
       </div>
 
-      <div>
-        <SectionLabel>メンバー</SectionLabel>
-        <Link
-          href="/me/members"
-          prefetch={false}
-          className="glass flex items-center gap-3 rounded-2xl p-4 transition-colors hover:border-marine/50"
-        >
-          <IconUsers size={18} className="shrink-0 text-fg-mute" />
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px]">一緒に使う人</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
-              Marine ID の登録と、割り勘・貯金それぞれへの参加を設定します。
-            </p>
+      {/* メンバーと Marine Link は、共有を組み立てる側の機能なのでマスターだけに出す */}
+      {profile?.is_master ? (
+        <>
+          <div>
+            <SectionLabel>メンバー</SectionLabel>
+            <Link
+              href="/me/members"
+              prefetch={false}
+              className="glass flex items-center gap-3 rounded-2xl p-4 transition-colors hover:border-marine/50"
+            >
+              <IconUsers size={18} className="shrink-0 text-fg-mute" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px]">一緒に使う人</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
+                  Marine ID の登録と、割り勘・貯金それぞれへの参加を設定します。
+                </p>
+              </div>
+              <IconChevronRight size={18} className="shrink-0 text-fg-mute" />
+            </Link>
           </div>
-          <IconChevronRight size={18} className="shrink-0 text-fg-mute" />
-        </Link>
-      </div>
 
-      <div>
-        <SectionLabel>Marine Link</SectionLabel>
-        <Link
-          href="/me/link"
-          prefetch={false}
-          className="glass flex items-center gap-3 rounded-2xl p-4 transition-colors hover:border-marine/50"
-        >
-          <IconLink size={18} className="shrink-0 text-fg-mute" />
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px]">アカウント間のデータ共有</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
-              Marine ID で接続し、貯金や割り勘を項目ごとに共有します。
-            </p>
+          <div>
+            <SectionLabel>Marine Link</SectionLabel>
+            <Link
+              href="/me/link"
+              prefetch={false}
+              className="glass flex items-center gap-3 rounded-2xl p-4 transition-colors hover:border-marine/50"
+            >
+              <IconLink size={18} className="shrink-0 text-fg-mute" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px]">アカウント間のデータ共有</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
+                  Marine ID で接続し、貯金や割り勘を項目ごとに共有します。
+                </p>
+              </div>
+              <IconChevronRight size={18} className="shrink-0 text-fg-mute" />
+            </Link>
           </div>
-          <IconChevronRight size={18} className="shrink-0 text-fg-mute" />
-        </Link>
-      </div>
+        </>
+      ) : null}
 
       {error ? <p className="text-[13px] text-danger">{error}</p> : null}
 

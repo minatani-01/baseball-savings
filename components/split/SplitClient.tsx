@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -45,19 +45,29 @@ export default function SplitClient({
   records,
   members,
   shared,
+  openNew = false,
 }: {
   userId: string
   records: SplitRecord[]
   members: SplitMemberView[]
   /** 相手から共有されている割り勘。閲覧のみで編集はできない */
   shared: SharedSplitRecord[]
+  /** ホームの「割り勘を作成」から来たか。真なら登録シートを開いて始める */
+  openNew?: boolean
 }) {
   const router = useRouter()
   const [filter, setFilter] = useState<SplitFilter>('unpaid')
   const [sort, setSort] = useState<SortOrder>('desc')
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheetOpen, setSheetOpen] = useState(openNew)
   const [editing, setEditing] = useState<SplitRecord | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // 開いたら ?new=1 を落としておく。残したままだと、シートを閉じたあとの
+  // 再読み込みや「戻る」でまた開いてしまう。
+  // history を直接書き換えるのは、router.replace だと再描画が一度挟まるため。
+  useEffect(() => {
+    if (openNew) window.history.replaceState(null, '', '/split')
+  }, [openNew])
 
   const memberNames = useMemo(() => members.map((m) => m.name), [members])
   // 精算や明細では名前しか手元に無いので、名前から写真を引けるようにしておく

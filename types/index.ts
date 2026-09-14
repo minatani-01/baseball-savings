@@ -12,6 +12,11 @@ export type Profile = {
    * null なら表示名の頭文字を表示する。
    */
   avatar_path: string | null
+  /**
+   * マスター権限。true のアカウントが送った接続リクエストは、
+   * 相手の承認を待たずに接続される（0013）。アプリからは変更できない。
+   */
+  is_master: boolean
   created_at: string
   updated_at: string
 }
@@ -106,8 +111,8 @@ export type SavingRules = {
   multiplier_interleague: number
   multiplier_cs: number
   multiplier_nippon_series: number
-  /** 月間の目標貯金額。0 は未設定 */
-  monthly_goal_amount: number
+  /** 年間の目標貯金額。0 は未設定（進捗バーを出さない） */
+  annual_goal_amount: number
 }
 
 /** 月末フロー。入金はワンバンク側で一度に終わるので中間状態は持たない */

@@ -31,7 +31,7 @@ import GameSheet from '@/components/savings/GameSheet'
 import CustomSavingSheet from '@/components/savings/CustomSavingSheet'
 import { createClient } from '@/lib/supabase/client'
 import { BREAKDOWN_GROUP_LABEL, groupBreakdown } from '@/lib/savings'
-import { confirmedTotal, goalProgress, monthOverMonth, pendingTotal } from '@/lib/insights'
+import { depositedTotal, goalProgress, monthOverMonth, notDepositedTotal } from '@/lib/insights'
 import { currentMonth, monthLabel, monthLabelEn, shortDate, yen } from '@/lib/format'
 import {
   MONTHLY_STATUS_LABEL,
@@ -56,6 +56,7 @@ export default function SavingsClient({
   monthlySavings,
   rules,
   goals,
+  isMaster,
 }: {
   userId: string
   entries: SavingEntryRow[]
@@ -63,12 +64,17 @@ export default function SavingsClient({
   rules: SavingRules
   /** 共同貯金（仕様書17章はロッテ貯金内の機能と定めている） */
   goals: SharedGoalView[]
+  /** マスター権限。確定が共有先にも反映される */
+  isMaster: boolean
 }) {
   const router = useRouter()
   const [sheetMode, setSheetMode] = useState<SheetMode | null>(null)
   const [editing, setEditing] = useState<SavingEntryRow | null>(null)
   const [addMode, setAddMode] = useState<SheetMode>('game')
   const [busy, setBusy] = useState(false)
+  // 確定が何人に反映されたか。押した直後だけ出す
+  const [sharedCount, setSharedCount] = useState<number | null>(null)
+  const [monthError, setMonthError] = useState<string | null>(null)
 
   const months = useMemo(() => {
     const set = new Set<string>(entries.map((e) => e.month))
@@ -78,10 +84,10 @@ export default function SavingsClient({
 
   const [month, setMonth] = useState(() => months[0] ?? currentMonth())
 
-  // 累計は「月末に確定した月」だけを数える（ホーム・履歴と同じ定義）
-  const total = useMemo(() => confirmedTotal(monthlySavings), [monthlySavings])
-  const notConfirmed = useMemo(
-    () => pendingTotal(entries, monthlySavings),
+  // 累計は「ワンバンクへ入金した月」だけを数える（ホーム・履歴と同じ定義）
+  const total = useMemo(() => depositedTotal(monthlySavings), [monthlySavings])
+  const notDeposited = useMemo(
+    () => notDepositedTotal(entries, monthlySavings),
     [entries, monthlySavings]
   )
   const delta = useMemo(() => monthOverMonth(entries, month), [entries, month])
@@ -99,7 +105,15 @@ export default function SavingsClient({
     [monthEntries]
   )
 
-  const goal = goalProgress(monthTotal, rules.monthly_goal_amount)
+  // 目標は年単位。進捗は「その年の入金済みの月」の合計で見る。
+  // 累計貯金額と同じ定義にそろえる（基準が2つあると、同じ画面の中で
+  // どちらが本当なのか読めなくなる）
+  const year = month.slice(0, 4)
+  const yearDeposited = useMemo(
+    () => depositedTotal(monthlySavings.filter((m) => m.month.startsWith(`${year}-`))),
+    [monthlySavings, year]
+  )
+  const goal = goalProgress(yearDeposited, rules.annual_goal_amount)
 
   const groups = useMemo(() => {
     const totals: Record<string, number> = { result: 0, batting: 0, pitching: 0, other: 0 }
@@ -114,6 +128,32 @@ export default function SavingsClient({
   const status: MonthlyStatus = monthly?.status ?? 'calculating'
   const confirmed = monthly?.confirmed_amount ?? null
   const displayAmount = status === 'calculating' || confirmed === null ? monthTotal : confirmed
+
+  /**
+   * 月末の確定と取り消し。
+   *
+   * 確定は「一緒に貯めている人の分もまとめて締める」操作なので、
+   * 自分の行を直接書かずに RPC を通す。相手の行に書き込むのは
+   * RLS では通らないため、confirm_month_for_circle（SECURITY DEFINER）が
+   * 貯金に参加している接続済みメンバーだけに限って書く。
+   * 入金済みは各自の財布の話なので、従来どおり自分の行だけを更新する。
+   */
+  const confirmMonth = async (confirm: boolean) => {
+    setBusy(true)
+    setMonthError(null)
+    const supabase = createClient()
+    const { data, error } = await supabase.rpc('confirm_month_for_circle', {
+      p_month: month,
+      p_confirm: confirm,
+    })
+    setBusy(false)
+    if (error) {
+      setMonthError(error.message)
+      return
+    }
+    setSharedCount(typeof data === 'number' ? data : 0)
+    router.refresh()
+  }
 
   const updateMonthly = async (patch: Partial<MonthlySaving>) => {
     setBusy(true)
@@ -154,8 +194,8 @@ export default function SavingsClient({
           <DeltaBadge percent={delta} />
         </div>
         <p className="mt-2 text-xs text-fg-mute">
-          月末に確定した金額の合計（今月分は含みません）
-          {notConfirmed > 0 ? ` / 未確定 ${yen(notConfirmed)}` : ''}
+          ワンバンクへ入金した金額の合計
+          {notDeposited > 0 ? ` / 未入金 ${yen(notDeposited)}` : ''}
         </p>
       </Card>
 
@@ -263,7 +303,7 @@ export default function SavingsClient({
               <ProgressBar
                 value={goal.current}
                 max={goal.goal}
-                label="目標金額"
+                label={`${year}年の目標`}
                 caption={`${yen(goal.current)} / ${yen(goal.goal)}`}
               />
             </div>
@@ -281,20 +321,22 @@ export default function SavingsClient({
 
           <div className="mt-4 flex flex-col gap-2 border-t border-line pt-4">
             {status === 'calculating' ? (
-              <Button
-                variant="primary"
-                full
-                disabled={busy || monthTotal <= 0}
-                onClick={() =>
-                  updateMonthly({
-                    status: 'ready',
-                    confirmed_amount: monthTotal,
-                    confirmed_at: new Date().toISOString(),
-                  })
-                }
-              >
-                この月の金額を確定する
-              </Button>
+              <>
+                <Button
+                  variant="primary"
+                  full
+                  disabled={busy || monthTotal <= 0}
+                  onClick={() => confirmMonth(true)}
+                >
+                  この月の金額を確定する
+                </Button>
+                {isMaster ? (
+                  <p className="text-[11px] leading-relaxed text-fg-mute">
+                    確定すると、貯金に参加している接続済みメンバーの同じ月も確定します。
+                    入金は各自で行うため、入金済みは相手には反映しません。
+                  </p>
+                ) : null}
+              </>
             ) : null}
 
             {status === 'ready' ? (
@@ -317,18 +359,18 @@ export default function SavingsClient({
                 >
                   入金済みにする
                 </Button>
-                <Button
-                  variant="ghost"
-                  full
-                  disabled={busy}
-                  onClick={() =>
-                    updateMonthly({ status: 'calculating', confirmed_amount: null, confirmed_at: null })
-                  }
-                >
+                <Button variant="ghost" full disabled={busy} onClick={() => confirmMonth(false)}>
                   確定を取り消す
                 </Button>
               </>
             ) : null}
+
+            {sharedCount !== null && sharedCount > 0 ? (
+              <p className="text-[11px] text-teal">
+                貯金に参加している接続済みメンバー {sharedCount} 人の同じ月も確定しました。
+              </p>
+            ) : null}
+            {monthError ? <p className="text-[13px] text-danger">{monthError}</p> : null}
 
             {status === 'deposited' ? (
               <>

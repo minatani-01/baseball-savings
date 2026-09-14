@@ -14,7 +14,7 @@ import {
 import { IconBaseball, IconCalendar, IconFlame, IconSpark } from '@/components/icons'
 import CategoryIcon from '@/components/CategoryIcon'
 import CumulativeChart, { type ChartPoint } from '@/components/charts/CumulativeChart'
-import { confirmedMonthSet, confirmedTotal, monthOverMonth, pendingTotal, streakDays, sumByYear } from '@/lib/insights'
+import { depositedMonthSet, depositedTotal, monthOverMonth, notDepositedTotal, streakDays, sumByYear } from '@/lib/insights'
 import { currentMonth, monthLabel, shortDate, yen } from '@/lib/format'
 import { categoryLabel, opponentLabel, resultLabel } from '@/lib/constants'
 import type { ExpenseCategory, MonthlySaving, SavingEntryRow, SplitRecord } from '@/types'
@@ -43,13 +43,13 @@ export default function HistoryClient({
 }) {
   const [tab, setTab] = useState<Tab>('trend')
 
-  // 累計は「月末に確定した月」だけを数える（ホーム・貯金と同じ定義）
-  const total = useMemo(() => confirmedTotal(monthlySavings), [monthlySavings])
-  const notConfirmed = useMemo(
-    () => pendingTotal(entries, monthlySavings),
+  // 累計は「ワンバンクへ入金した月」だけを数える（ホーム・貯金と同じ定義）
+  const total = useMemo(() => depositedTotal(monthlySavings), [monthlySavings])
+  const notDeposited = useMemo(
+    () => notDepositedTotal(entries, monthlySavings),
     [entries, monthlySavings]
   )
-  const confirmed = useMemo(() => confirmedMonthSet(monthlySavings), [monthlySavings])
+  const deposited = useMemo(() => depositedMonthSet(monthlySavings), [monthlySavings])
   const month = currentMonth()
   const monthTotal = useMemo(
     () => entries.filter((e) => e.month === month).reduce((sum, e) => sum + e.amount, 0),
@@ -58,17 +58,17 @@ export default function HistoryClient({
   const delta = useMemo(() => monthOverMonth(entries, month), [entries, month])
   const streak = useMemo(() => streakDays(entries), [entries])
 
-  // 推移も確定した月だけを積む。グラフの終点と上の累計額を必ず一致させる
+  // 推移も入金済みの月だけを積む。グラフの終点と上の累計額を必ず一致させる
   const chartPoints: ChartPoint[] = useMemo(() => {
     const sorted = [...entries]
-      .filter((e) => confirmed.has(e.month))
+      .filter((e) => deposited.has(e.month))
       .sort((a, b) => a.entry_date.localeCompare(b.entry_date))
     let cumulative = 0
     return sorted.map((entry) => {
       cumulative += entry.amount
       return { date: entry.entry_date, value: cumulative }
     })
-  }, [entries, confirmed])
+  }, [entries, deposited])
 
   const timeline: TimelineItem[] = useMemo(
     () =>
@@ -162,8 +162,8 @@ export default function HistoryClient({
               <DeltaBadge percent={delta} />
             </div>
             <p className="mt-1 text-[11px] text-fg-mute">
-              月末に確定した金額の合計（今月分は含みません）
-              {notConfirmed > 0 ? ` / 未確定 ${yen(notConfirmed)}` : ''}
+              ワンバンクへ入金した金額の合計
+              {notDeposited > 0 ? ` / 未入金 ${yen(notDeposited)}` : ''}
             </p>
             <div className="mt-4">
               <CumulativeChart points={chartPoints} />
