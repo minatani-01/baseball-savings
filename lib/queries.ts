@@ -18,7 +18,6 @@ import type {
   SharedGoalMemberProgress,
   SharedGoalRow,
   SharedGoalView,
-  SharedSavingEntry,
   SharedSplitRecord,
   SplitMember,
   SplitMemberView,
@@ -404,41 +403,6 @@ export async function getMonthSavingTotal(userId: string, month: string): Promis
  * その絞り込みは RLS が行う。ここでは自分以外の行を取りに行くだけでよい。
  * 所有者の表示名は接続済みなら profiles から読める。
  */
-/**
- * 相手から共有されている積立の記録（仕様書 14章の 'saving'）。
- *
- * 見えるかどうかは RLS（saving_entries_select_linked）が決める。
- * ここでは「自分以外の行」を引くだけで、接続していない相手や
- * 貯金を共有していない相手の行はそもそも返ってこない。
- *
- * 割り勘に「共有されている割り勘」があるのに貯金には無く、
- * 共有はできているのに相手の画面に出ない状態だったので追加した。
- */
-export async function getSharedSavingEntries(userId: string): Promise<SharedSavingEntry[]> {
-  const supabase = await createClient()
-
-  const rows = await read<SavingEntryRow[]>('saving_entries', () =>
-    supabase
-      .from('saving_entries')
-      .select('*, game:games(*)')
-      .neq('user_id', userId)
-      .order('entry_date', { ascending: false })
-  )
-  if (!rows || rows.length === 0) return []
-
-  const ownerIds = [...new Set(rows.map((r) => r.user_id))]
-  const owners = await read<Profile[]>('profiles', () =>
-    supabase.from('profiles').select('*').in('id', ownerIds)
-  )
-  const ownerById = new Map((owners ?? []).map((p) => [p.id, p]))
-
-  return rows.map((row) => ({
-    ...row,
-    owner_name: ownerById.get(row.user_id)?.display_name ?? '',
-    owner_marine_id: ownerById.get(row.user_id)?.marine_id ?? '',
-  }))
-}
-
 export async function getSharedSplitRecords(userId: string): Promise<SharedSplitRecord[]> {
   const supabase = await createClient()
 
