@@ -185,7 +185,8 @@ export default async function HomePage() {
           <IconChevronRight size={18} />
         </Link>
         <Link
-          href="/split"
+          // 「作成」なので、割り勘タブを開くだけでなく登録シートまで開く
+          href="/split?new=1"
           prefetch={false}
           className="glass flex min-h-[54px] items-center justify-between gap-3 rounded-2xl px-4 transition-colors hover:border-marine/50"
         >
