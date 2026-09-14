@@ -141,13 +141,16 @@ export default async function HomePage() {
           1人分 / ワンバンクへ入金した金額の合計
         </div>
 
+        {/* 1人分と同じ「見出し → 金額 → 内訳」の並びにして、2つを同じ文脈で読めるようにする */}
         {circleSize > 1 ? (
-          <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-line pt-3">
-            <div>
-              <div className="eyebrow">総累計貯金額</div>
-              <div className="mt-0.5 text-[11px] text-fg-mute">{circleSize}人分</div>
+          <div className="mt-3 border-t border-line pt-3">
+            <div className="eyebrow">総累計貯金額</div>
+            <div className="mt-2">
+              <Amount value={circleTotal} size="lg" tone="marine" />
             </div>
-            <div className="tnum text-xl font-semibold">{yen(circleTotal)}</div>
+            <div className="mt-1 text-[11px] text-fg-mute">
+              {circleSize}人分 / 合算しているメンバーを含む合計
+            </div>
           </div>
         ) : null}
 
