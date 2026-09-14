@@ -18,7 +18,7 @@ export default async function SavingsPage() {
   const [entries, monthlySavings, rules, goals, profile, shared, games] = await Promise.all([
     getSavingEntries(user.id),
     getMonthlySavings(user.id),
-    getSavingRules(user.id),
+    getSavingRules(),
     getSharedGoals(),
     getProfile(user.id),
     getSharedSavingEntries(user.id),

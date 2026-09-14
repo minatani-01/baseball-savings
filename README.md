@@ -59,7 +59,7 @@ Supabase の SQL Editor で番号順に実行します（何度実行しても�
 
 | ファイル | 内容 |
 | --- | --- |
-| `0001_marine_wallet_core.sql` | 共通スキーマ（`profiles` / `saving_rules` / `games` / `saving_entries` / `monthly_savings`）とRLS |
+| `0001_marine_wallet_core.sql` | 共通スキーマ（`profiles` / `saving_rules` / `games` / `saving_entries` / `monthly_savings`）とRLS。`saving_rules` は 0017 で `saving_rule_settings` に置き換え |
 | `0002_import_legacy_games.sql` | 旧ロッテ貯金アプリからのデータ移行（実施済みの記録。再実行用のクエリを含む） |
 | `0003_confirmed_ui.sql` | 確定UIに合わせたボーナス項目とカスタム貯金の追加 |
 | `0004_home_away_nullable.sql` | 旧アプリが未記録だったホーム/ビジターを null 許容にする |
@@ -75,6 +75,7 @@ Supabase の SQL Editor で番号順に実行します（何度実行しても�
 | `0014_confirm_month_for_circle.sql` | 月末の確定を、貯金に参加している接続済みメンバーにも反映する |
 | `0015_totals_by_deposited.sql` | 累計貯金額の基準を「確定した月」から「入金した月」へ |
 | `0016_circle_by_link.sql` | 総累計貯金額を、メンバー登録ではなく Marine Link の接続で決める |
+| `0017_shared_saving_rules.sql` | 貯金ルールを全アカウント共通の1行にし、共有設定の「貯金ルール」を変更権限に変える |
 
 ## デプロイ
 
@@ -123,6 +124,10 @@ master への push で Vercel が Production を自動デプロイします。�
 
 ## 設計上のポイント
 
+- **貯金ルールは全アカウント共通**。`saving_rule_settings` に1行だけ置きます。
+  変更できるのはマスターと、マスターが接続の共有設定で「貯金ルール」をONにした相手だけです
+  （`can_edit_saving_rules()`）。権限が無い人には読み取り専用で見せます。
+  共有設定の「貯金ルール」は、見せるかどうかではなく**変更権限を渡すかどうか**です。
 - **試合データは共有**（仕様書 15章）。`games` は全ユーザー共通で、
   `saving_entries` がユーザーごとの積立予定額を持ちます。
   誰かが登録した試合は他の人の画面にも共通データとして現れるので、貯金タブの

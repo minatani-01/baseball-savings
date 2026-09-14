@@ -47,7 +47,7 @@ export default async function HomePage() {
     getSavingEntries(user.id),
     getMonthlySavings(user.id),
     getSplitRecords(user.id),
-    getSavingRules(user.id),
+    getSavingRules(),
     getSavingCircleTotals(),
   ])
 
