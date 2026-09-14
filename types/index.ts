@@ -7,6 +7,11 @@ export type Profile = {
   id: string
   display_name: string
   marine_id: string
+  /**
+   * プロフィールアイコンの保存先（member-avatars バケット上のパス）。
+   * null なら表示名の頭文字を表示する。
+   */
+  avatar_path: string | null
   created_at: string
   updated_at: string
 }
@@ -143,9 +148,21 @@ export type SplitMember = {
   join_split: boolean
   /** 貯金に参加するか（総累計貯金額の集計対象になる） */
   join_saving: boolean
+  /**
+   * member-avatars バケット上のパス。null なら名前の頭文字を表示する。
+   * バケットは非公開なので、パスをそのまま画像のURLにはできない。
+   */
+  avatar_path: string | null
   created_at: string
   updated_at: string
 }
+
+/**
+ * 画面に渡すメンバー。
+ * avatar_url は avatar_path から都度発行する署名付きURLで、DBの列ではない。
+ * 発行に失敗したときや写真が未設定のときは null になり、頭文字表示に戻る。
+ */
+export type SplitMemberView = SplitMember & { avatar_url: string | null }
 
 /** 相手から共有されている割り勘。誰のものかを表示するため所有者情報を添える */
 export type SharedSplitRecord = SplitRecord & {

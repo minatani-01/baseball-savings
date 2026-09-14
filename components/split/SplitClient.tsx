@@ -22,9 +22,16 @@ import { CopyAmountButton, OpenAppButton } from '@/components/HandoffActions'
 import SplitSheet from '@/components/split/SplitSheet'
 import { createClient } from '@/lib/supabase/client'
 import { distributeEqual, simplifyDebts } from '@/lib/warikan'
-import { shortDate, yen } from '@/lib/format'
+import { dueYen, shortDate, yen } from '@/lib/format'
 import { categoryLabel } from '@/lib/constants'
-import type { Share, SharedSplitRecord, SortOrder, SplitFilter, SplitMember, SplitRecord } from '@/types'
+import type {
+  Share,
+  SharedSplitRecord,
+  SortOrder,
+  SplitFilter,
+  SplitMemberView,
+  SplitRecord,
+} from '@/types'
 
 function sharesOf(record: SplitRecord, fallbackNames: string[]): Share[] {
   if (record.shares && record.shares.length > 0) return record.shares
@@ -41,7 +48,7 @@ export default function SplitClient({
 }: {
   userId: string
   records: SplitRecord[]
-  members: SplitMember[]
+  members: SplitMemberView[]
   /** 相手から共有されている割り勘。閲覧のみで編集はできない */
   shared: SharedSplitRecord[]
 }) {
@@ -53,10 +60,18 @@ export default function SplitClient({
   const [busy, setBusy] = useState(false)
 
   const memberNames = useMemo(() => members.map((m) => m.name), [members])
+  // 精算や明細では名前しか手元に無いので、名前から写真を引けるようにしておく
+  const avatarOf = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const m of members) {
+      if (m.avatar_url) map.set(m.name, m.avatar_url)
+    }
+    return (name: string) => map.get(name) ?? null
+  }, [members])
   const unpaid = useMemo(() => records.filter((r) => r.status === 'unpaid'), [records])
   const paid = useMemo(() => records.filter((r) => r.status === 'paid'), [records])
 
-  const { paidTotals, transfers, unpaidTotal, settlementTotal, balancedTotal } = useMemo(() => {
+  const { dueTotals, transfers, unpaidTotal, settlementTotal, balancedTotal } = useMemo(() => {
     const paidMap = new Map<string, number>(memberNames.map((m) => [m, 0]))
     const burdenMap = new Map<string, number>(memberNames.map((m) => [m, 0]))
 
@@ -73,13 +88,22 @@ export default function SplitClient({
       balance: (paidMap.get(member) ?? 0) - (burdenMap.get(member) ?? 0),
     }))
 
+    // 未精算ぶんの「その人が払う金額」。負担した額から立替えた額を引く。
+    // 立替えの方が多い人はマイナス（＝受け取る側）になる。
+    const dueMap = new Map<string, number>(
+      [...names].map((member) => [
+        member,
+        (burdenMap.get(member) ?? 0) - (paidMap.get(member) ?? 0),
+      ])
+    )
+
     const transfers = simplifyDebts(balances)
     // 未精算レコードの総額と、そのうち実際に動かす必要がある金額（＝精算額）を分けて持つ
     const unpaidTotal = unpaid.reduce((sum, r) => sum + r.amount, 0)
     const settlementTotal = transfers.reduce((sum, t) => sum + t.amount, 0)
 
     return {
-      paidTotals: paidMap,
+      dueTotals: dueMap,
       transfers,
       unpaidTotal,
       settlementTotal,
@@ -141,7 +165,7 @@ export default function SplitClient({
             <IconUsers size={17} />
           </IconFrame>
           <div className="min-w-0 flex-1">
-            <div className="eyebrow">未精算の合計</div>
+            <div className="eyebrow">精算に必要な額</div>
             <div className="mt-1.5">
               <Amount value={settlementTotal} size="xl" tone="marine" />
             </div>
@@ -164,7 +188,7 @@ export default function SplitClient({
         <SectionLabel
           action={
             <Link
-              href="/split/members"
+              href="/me/members"
               prefetch={false}
               className="inline-flex items-center gap-1 text-[12px] text-fg-dim hover:text-marine"
             >
@@ -184,17 +208,26 @@ export default function SplitClient({
             <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
               {members.map((m) => (
                 <div key={m.id} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
-                  <Avatar name={m.name} selected={m.is_self} />
+                  <Avatar name={m.name} src={m.avatar_url} selected={m.is_self} />
                   <span className="w-full truncate text-center text-[11px] text-fg-dim">
                     {m.is_self ? 'あなた' : m.name}
                   </span>
-                  <span className="tnum text-center text-[11px] text-fg-mute">
-                    {yen(paidTotals.get(m.name) ?? 0)}
+                  {/* その人が払う金額。受け取る側はマイナスで出す */}
+                  <span
+                    className={`tnum text-center text-[11px] ${
+                      (dueTotals.get(m.name) ?? 0) < 0
+                        ? 'text-teal'
+                        : (dueTotals.get(m.name) ?? 0) > 0
+                          ? 'text-fg-dim'
+                          : 'text-fg-mute'
+                    }`}
+                  >
+                    {dueYen(dueTotals.get(m.name) ?? 0)}
                   </span>
                 </div>
               ))}
               <Link
-                href="/split/members"
+                href="/me/members"
                 prefetch={false}
                 aria-label="メンバーを追加"
                 className="flex w-16 shrink-0 flex-col items-center gap-1.5"
@@ -206,6 +239,12 @@ export default function SplitClient({
               </Link>
             </div>
           )}
+          {members.length > 0 ? (
+            <p className="mt-3 border-t border-line pt-3 text-[11px] leading-relaxed text-fg-mute">
+              金額は未精算ぶんの精算額です。プラスはその人が払う金額、
+              マイナスは受け取る金額を表します。
+            </p>
+          ) : null}
         </Card>
       </div>
 
@@ -222,10 +261,10 @@ export default function SplitClient({
               <Card key={`${t.from}-${t.to}-${t.amount}`}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-2 text-sm">
-                    <Avatar name={t.from} size={26} />
+                    <Avatar name={t.from} src={avatarOf(t.from)} size={26} />
                     <span className="truncate">{t.from}</span>
                     <span className="text-fg-mute">→</span>
-                    <Avatar name={t.to} size={26} />
+                    <Avatar name={t.to} src={avatarOf(t.to)} size={26} />
                     <span className="truncate">{t.to}</span>
                   </div>
                   <Amount value={t.amount} size="md" tone="marine" />
@@ -319,7 +358,7 @@ export default function SplitClient({
                     {sharesOf(record, memberNames)
                       .slice(0, 4)
                       .map((s) => (
-                        <Avatar key={s.member} name={s.member} size={22} />
+                        <Avatar key={s.member} name={s.member} src={avatarOf(s.member)} size={22} />
                       ))}
                     {record.member_count > 4 ? (
                       <span className="text-[11px] text-fg-mute">+{record.member_count - 4}</span>

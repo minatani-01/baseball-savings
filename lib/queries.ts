@@ -1,6 +1,7 @@
 import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { DEFAULT_SAVING_RULES } from '@/lib/savings'
+import { MEMBER_AVATAR_BUCKET, MEMBER_AVATAR_TTL_SECONDS } from '@/lib/constants'
 import type {
   Game,
   LinkMonthlyCompare,
@@ -19,6 +20,7 @@ import type {
   SharedGoalView,
   SharedSplitRecord,
   SplitMember,
+  SplitMemberView,
   SplitRecord,
 } from '@/types'
 
@@ -115,6 +117,21 @@ export async function getProfile(userId: string): Promise<Profile | null> {
   )
 }
 
+/**
+ * 非公開バケットに置いた画像の署名付きURLを1件ぶん発行する。
+ *
+ * 失敗しても投げない。アイコンは飾りなので、頭文字表示に戻せば実害がない。
+ * 金額の取得（read）と違い、欠けても “それらしい誤った値” にはならない。
+ */
+export async function signAvatarUrl(path: string | null): Promise<string | null> {
+  if (!path) return null
+  const supabase = await createClient()
+  const { data } = await supabase.storage
+    .from(MEMBER_AVATAR_BUCKET)
+    .createSignedUrl(path, MEMBER_AVATAR_TTL_SECONDS)
+  return data?.signedUrl ?? null
+}
+
 export async function getSavingRules(userId: string): Promise<SavingRules> {
   const supabase = await createClient()
   const data = await read<SavingRules>('saving_rules', () =>
@@ -173,7 +190,7 @@ export async function getSplitRecords(userId: string): Promise<SplitRecord[]> {
   return data ?? []
 }
 
-export async function getSplitMembers(userId: string): Promise<SplitMember[]> {
+export async function getSplitMembers(userId: string): Promise<SplitMemberView[]> {
   const supabase = await createClient()
   const data = await read<SplitMember[]>('split_members', () =>
     supabase
@@ -183,7 +200,33 @@ export async function getSplitMembers(userId: string): Promise<SplitMember[]> {
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
   )
-  return data ?? []
+  const members = data ?? []
+
+  // 写真は非公開バケットに置いてあるので、表示のたびに署名付きURLを発行する。
+  // 1枚も無ければ Storage には触らない（写真を使っていない人にコストを増やさない）。
+  const paths = members
+    .map((m) => m.avatar_path)
+    .filter((path): path is string => typeof path === 'string' && path !== '')
+
+  if (paths.length === 0) {
+    return members.map((m) => ({ ...m, avatar_url: null }))
+  }
+
+  // 署名に失敗しても投げない。写真は飾りなので、頭文字表示に戻せば実害がない。
+  // 金額の取得（read）と違い、欠けても “それらしい誤った値” にはならない。
+  const { data: signed } = await supabase.storage
+    .from(MEMBER_AVATAR_BUCKET)
+    .createSignedUrls(paths, MEMBER_AVATAR_TTL_SECONDS)
+
+  const urls = new Map<string, string>()
+  for (const row of signed ?? []) {
+    if (row.path && row.signedUrl && !row.error) urls.set(row.path, row.signedUrl)
+  }
+
+  return members.map((m) => ({
+    ...m,
+    avatar_url: m.avatar_path ? (urls.get(m.avatar_path) ?? null) : null,
+  }))
 }
 
 /** 直近の共通試合データ（貯金未登録の試合を拾うために使う） */
