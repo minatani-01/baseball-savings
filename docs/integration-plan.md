@@ -22,7 +22,7 @@
 | 論点 | 判断 | 理由 |
 | --- | --- | --- |
 | ベースにするコード | 割り勘側のスタック（Next.js 16 / Tailwind v4 / Supabase SSR） | 仕様書39章の推奨構成と一致し、SSR認証・App Router が既に動作していたため。貯金側は画面数が少なく移植コストが低い |
-| リポジトリ | `baseball-savings` を Marine Wallet 本体へ転換 | 既存の公開URLと履歴を活かせる。Vite構成（`src/`, `index.html`, `vite.config.js`）は削除した |
+| リポジトリ | `baseball-savings` を Marine Wallet 本体へ転換し、のちに `marine-wallet` へ改称 | 既存の履歴を活かせる。Vite構成（`src/`, `index.html`, `vite.config.js`）は削除した |
 | Supabase | 旧「割り勘メモ」プロジェクト（現 Marine Wallet / `xliszlnpypvqghrwplxa`）を共通DBへ拡張 | 稼働中のプロジェクトを土台にでき、既存の割り勘データ（92件）を移行せずに済む。貯金側は PAUSED で復旧が必要なため移行元とする |
 | 認証 | Supabase Auth（メール/パスワード）に一本化 | 仕様書34章の推奨どおり |
 | データ書き込み | クライアントから RLS 経由で直接実行 | 個人利用規模でAPIルートを二重に持つ必要がないため。整合性は DB の CHECK 制約と RLS で担保する |
@@ -59,6 +59,16 @@
 - 数値は `tabular-nums`（`.tnum`）で桁を揃える。英字ラベルは `.eyebrow` でトラッキングを効かせる
 
 ---
+
+### 1.5 統合後の現在地
+
+| | |
+| --- | --- |
+| リポジトリ | `minatani-01/marine-wallet`（旧 `baseball-savings` を改称。旧URLはGitHubがリダイレクトする） |
+| 公開URL | marine-wallet.vercel.app（旧 baseball-savings.vercel.app は削除済み） |
+| Vercelプロジェクト名 | `baseball-savings` のまま（プロジェクト名の変更はデプロイに影響しないため据え置き） |
+| Supabase | Marine Wallet / `xliszlnpypvqghrwplxa` |
+| 旧リソース | `warikan-app` リポジトリ・Vercelプロジェクト、旧貯金Supabaseプロジェクトはいずれも削除／PAUSED 済み |
 
 ## 2. データモデル
 

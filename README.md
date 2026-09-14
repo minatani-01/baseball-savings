@@ -16,6 +16,9 @@
 | ロッテ貯金（baseball-savings） | Vite + React + Supabase | 貯金タブ |
 | 割り勘アプリ（warikan-app） | Next.js + Supabase | 割り勘タブ |
 
+本リポジトリは旧 `baseball-savings` を改称したものです（`minatani-01/marine-wallet`）。
+公開URLは marine-wallet.vercel.app です。
+
 ## 技術スタック
 
 - Next.js 16（App Router / Turbopack）
