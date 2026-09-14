@@ -3,6 +3,7 @@ import SavingsClient from '@/components/savings/SavingsClient'
 import {
   getMonthlySavings,
   getProfile,
+  getRecentGames,
   getSavingEntries,
   getSavingRules,
   getSessionUser,
@@ -14,13 +15,15 @@ export default async function SavingsPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const [entries, monthlySavings, rules, goals, profile, shared] = await Promise.all([
+  const [entries, monthlySavings, rules, goals, profile, shared, games] = await Promise.all([
     getSavingEntries(user.id),
     getMonthlySavings(user.id),
     getSavingRules(user.id),
     getSharedGoals(),
     getProfile(user.id),
     getSharedSavingEntries(user.id),
+    // 共通の試合。自分がまだ積み立てていないものを拾うために使う
+    getRecentGames(400),
   ])
 
   return (
@@ -32,6 +35,7 @@ export default async function SavingsPage() {
       goals={goals}
       isMaster={profile?.is_master ?? false}
       shared={shared}
+      games={games}
     />
   )
 }
