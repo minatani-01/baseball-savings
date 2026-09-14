@@ -169,14 +169,14 @@ export async function signAvatarUrl(path: string | null): Promise<string | null>
   return data?.signedUrl ?? null
 }
 
-export async function getSavingRules(userId: string): Promise<SavingRules> {
+export async function getSavingRules(): Promise<SavingRules> {
   const supabase = await createClient()
-  const data = await read<SavingRules>('saving_rules', () =>
-    supabase.from('saving_rules').select('*').eq('user_id', userId).maybeSingle()
+  const data = await read<SavingRules>('saving_rule_settings', () =>
+    supabase.from('saving_rule_settings').select('*').eq('id', true).maybeSingle()
   )
 
-  // 行が無いのは正常（まだルール未設定）。取得失敗とは区別する
-  if (!data) return { ...DEFAULT_SAVING_RULES, user_id: userId }
+  // 行が無いのは想定外だが、既定値で動かせるので画面は止めない
+  if (!data) return { ...DEFAULT_SAVING_RULES }
 
   // numeric 型は文字列で返るため数値に正規化する
   return {
@@ -186,6 +186,17 @@ export async function getSavingRules(userId: string): Promise<SavingRules> {
     multiplier_cs: Number(data.multiplier_cs),
     multiplier_nippon_series: Number(data.multiplier_nippon_series),
   }
+}
+
+/**
+ * 共通の貯金ルールを変更できるか。
+ * マスター本人か、マスターが共有設定で「貯金ルール」をONにした相手だけ true。
+ */
+export async function canEditSavingRules(): Promise<boolean> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('can_edit_saving_rules')
+  if (error) return false
+  return data === true
 }
 
 export async function getSavingEntries(userId: string): Promise<SavingEntryRow[]> {

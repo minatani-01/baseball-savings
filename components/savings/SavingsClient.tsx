@@ -30,7 +30,7 @@ import { CopyAmountButton, OpenAppButton } from '@/components/HandoffActions'
 import GameSheet from '@/components/savings/GameSheet'
 import CustomSavingSheet from '@/components/savings/CustomSavingSheet'
 import { createClient } from '@/lib/supabase/client'
-import { BREAKDOWN_GROUP_LABEL, groupBreakdown } from '@/lib/savings'
+import { BREAKDOWN_GROUP_LABEL, calcSaving, groupBreakdown } from '@/lib/savings'
 import { depositedTotal, goalProgress, monthOverMonth, notDepositedTotal } from '@/lib/insights'
 import { currentMonth, monthLabel, monthLabelEn, shortDate, yen } from '@/lib/format'
 import {
@@ -43,6 +43,7 @@ import {
 import type {
   MonthlySaving,
   MonthlyStatus,
+  Game,
   SavingEntryRow,
   SavingRules,
   SharedGoalView,
@@ -65,6 +66,7 @@ export default function SavingsClient({
   goals,
   isMaster,
   shared,
+  games,
 }: {
   userId: string
   entries: SavingEntryRow[]
@@ -76,6 +78,8 @@ export default function SavingsClient({
   isMaster: boolean
   /** 相手から共有されている積立の記録。閲覧のみで編集はできない */
   shared: SharedSavingEntry[]
+  /** 共通の試合データ。まだ自分が積み立てていないものを拾う */
+  games: Game[]
 }) {
   const router = useRouter()
   const [sheetMode, setSheetMode] = useState<SheetMode | null>(null)
@@ -114,6 +118,30 @@ export default function SavingsClient({
   const monthTotal = useMemo(
     () => monthEntries.reduce((sum, e) => sum + e.amount, 0),
     [monthEntries]
+  )
+
+  /**
+   * この月の「まだ自分が積み立てていない試合」。
+   *
+   * 試合データは全ユーザー共通で、貯金ルールは個人（仕様書15章）。
+   * これまでは自分で試合を登録したときにしか積立が立たず、
+   * 他の人が登録した試合は共通データにあるのに自分の貯金には入らなかった。
+   * ここから自分のルールで積み立てられるようにする。
+   */
+  const registeredGameIds = useMemo(
+    () => new Set(entries.map((e) => e.game_id).filter(Boolean) as string[]),
+    [entries]
+  )
+  const monthUnregistered = useMemo(
+    () =>
+      games
+        .filter((g) => g.game_date.startsWith(`${month}-`) && !registeredGameIds.has(g.id))
+        .sort((a, b) => b.game_date.localeCompare(a.game_date)),
+    [games, month, registeredGameIds]
+  )
+  const unregisteredTotal = useMemo(
+    () => monthUnregistered.reduce((sum, g) => sum + calcSaving(g, rules).amount, 0),
+    [monthUnregistered, rules]
   )
 
   const monthShared = useMemo(
@@ -171,6 +199,40 @@ export default function SavingsClient({
       return
     }
     setSharedCount(typeof data === 'number' ? data : 0)
+    router.refresh()
+  }
+
+  /**
+   * 共通の試合から、自分のルールで積立を作る。
+   * 試合そのものは触らない（共通データなので、金額だけが個人のもの）。
+   */
+  const registerGames = async (targets: Game[]) => {
+    if (targets.length === 0) return
+    setBusy(true)
+    setMonthError(null)
+    const supabase = createClient()
+    const rows = targets.map((game) => {
+      const calc = calcSaving(game, rules)
+      return {
+        user_id: userId,
+        game_id: game.id,
+        kind: 'game' as const,
+        title: '',
+        entry_date: game.game_date,
+        amount: calc.amount,
+        breakdown: calc.lines,
+        other_amount: 0,
+        other_note: '',
+      }
+    })
+    const { error } = await supabase
+      .from('saving_entries')
+      .upsert(rows, { onConflict: 'user_id,game_id' })
+    setBusy(false)
+    if (error) {
+      setMonthError('積立の登録に失敗しました')
+      return
+    }
     router.refresh()
   }
 
@@ -507,6 +569,74 @@ export default function SavingsClient({
           </div>
         )}
       </div>
+
+      {/* まだ自分が積み立てていない共通の試合 */}
+      {monthUnregistered.length > 0 ? (
+        <div>
+          <SectionLabel>未登録の試合</SectionLabel>
+          <Card>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[13px]">
+                  この月に {monthUnregistered.length} 試合ぶん、まだ積み立てていません。
+                </p>
+                <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
+                  試合データは全員共通です。あなたの貯金ルールで計算して積み立てます。
+                </p>
+              </div>
+              <Amount value={unregisteredTotal} size="sm" tone="marine" />
+            </div>
+            <Button
+              variant="primary"
+              full
+              disabled={busy}
+              onClick={() => registerGames(monthUnregistered)}
+              className="mt-3"
+            >
+              この月をまとめて積み立てる
+            </Button>
+          </Card>
+
+          <div className="mt-2 flex flex-col gap-2">
+            {monthUnregistered.map((game) => (
+              <Card key={game.id} className="!p-3.5">
+                <div className="flex items-center gap-3">
+                  <IconFrame>
+                    <IconBaseball size={17} />
+                  </IconFrame>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-[11px] text-fg-mute">
+                      <span className="tnum">{shortDate(game.game_date)}</span>
+                      {game.phase !== 'regular' ? <span>{phaseLabel(game.phase)}</span> : null}
+                    </div>
+                    <div className="mt-1 truncate text-sm">
+                      {resultLabel(game.result, game.is_sayonara)}
+                      <span className="text-fg-mute"> vs </span>
+                      {opponentLabel(game.opponent)}
+                      {game.marines_score != null && game.opponent_score != null ? (
+                        <span className="tnum text-fg-mute">
+                          {' '}
+                          {game.marines_score}-{game.opponent_score}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Amount value={calcSaving(game, rules).amount} size="sm" tone="dim" />
+                    <Button
+                      onClick={() => registerGames([game])}
+                      disabled={busy}
+                      className="!min-h-[36px] !px-3 text-[12px]"
+                    >
+                      積み立てる
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {/* 相手から共有されている記録。閲覧のみで、編集も削除もしない */}
       {monthShared.length > 0 ? (

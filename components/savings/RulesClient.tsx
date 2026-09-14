@@ -69,9 +69,12 @@ const MULTIPLIERS: { key: MultiplierKey; label: string }[] = [
 export default function RulesClient({
   userId,
   initialRules,
+  canEdit,
 }: {
   userId: string
   initialRules: SavingRules
+  /** 共通ルールを変更できるか。できない人には読み取り専用で見せる */
+  canEdit: boolean
 }) {
   const router = useRouter()
   const [rules, setRules] = useState<SavingRules>(initialRules)
@@ -98,10 +101,10 @@ export default function RulesClient({
     setSaving(true)
     setError(null)
     const supabase = createClient()
-    const { user_id: _ignored, ...values } = rules
     const { error } = await supabase
-      .from('saving_rules')
-      .upsert({ user_id: userId, ...values }, { onConflict: 'user_id' })
+      .from('saving_rule_settings')
+      .update({ ...rules, updated_by: userId })
+      .eq('id', true)
     setSaving(false)
     if (error) {
       setError('保存に失敗しました')
@@ -112,15 +115,23 @@ export default function RulesClient({
   }
 
   const numberInput =
-    'tnum w-28 rounded-lg border border-line bg-ink-2/80 px-3 py-2 text-right text-fg outline-none transition-colors focus:border-marine/70'
+    'tnum w-28 rounded-lg border border-line bg-ink-2/80 px-3 py-2 text-right text-fg outline-none transition-colors focus:border-marine/70 disabled:opacity-60'
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <p className="text-[13px] leading-relaxed text-fg-mute">
           試合ごとの入力を減らし、ここで決めたルールから積立予定額を自動計算します。
-          過去に記録済みの試合の金額は、ルールを変更しても書き換わりません。
+          ルールは全アカウント共通です。過去に記録済みの試合の金額は、
+          ルールを変更しても書き換わりません。
         </p>
+        {canEdit ? null : (
+          <p className="mt-2 text-[13px] leading-relaxed text-warn">
+            変更する権限がありません。表示のみです。
+            変更できるようにするには、マスターのメンバー画面で、あなたとの接続の
+            「共有設定」から「貯金ルール」をONにしてもらってください。
+          </p>
+        )}
       </div>
 
       {AMOUNT_SECTIONS.map((section) => (
@@ -144,7 +155,8 @@ export default function RulesClient({
                       step={100}
                       value={rules[item.key]}
                       onChange={(e) => setAmount(item.key, e.target.value)}
-                      className={numberInput}
+                      disabled={!canEdit}
+                className={numberInput}
                     />
                   </div>
                 </div>
@@ -183,6 +195,7 @@ export default function RulesClient({
                   }))
                   setSaved(false)
                 }}
+                disabled={!canEdit}
                 className={numberInput}
               />
             </div>
@@ -210,7 +223,8 @@ export default function RulesClient({
                     step={0.1}
                     value={rules[item.key]}
                     onChange={(e) => setMultiplier(item.key, e.target.value)}
-                    className={numberInput}
+                    disabled={!canEdit}
+                className={numberInput}
                   />
                 </div>
               </div>
@@ -219,23 +233,25 @@ export default function RulesClient({
         </Card>
       </div>
 
-      <div className="flex flex-col gap-2">
-        {error ? <p className="text-[13px] text-danger">{error}</p> : null}
-        {saved ? <p className="text-[13px] text-teal">保存しました</p> : null}
-        <Button variant="primary" full onClick={save} disabled={saving}>
-          {saving ? '保存中' : 'ルールを保存する'}
-        </Button>
-        <Button
-          variant="ghost"
-          full
-          onClick={() => {
-            setRules({ ...DEFAULT_SAVING_RULES, user_id: userId })
-            setSaved(false)
-          }}
-        >
-          初期値に戻す
-        </Button>
-      </div>
+      {canEdit ? (
+        <div className="flex flex-col gap-2">
+          {error ? <p className="text-[13px] text-danger">{error}</p> : null}
+          {saved ? <p className="text-[13px] text-teal">保存しました</p> : null}
+          <Button variant="primary" full onClick={save} disabled={saving}>
+            {saving ? '保存中' : 'ルールを保存する'}
+          </Button>
+          <Button
+            variant="ghost"
+            full
+            onClick={() => {
+              setRules({ ...DEFAULT_SAVING_RULES })
+              setSaved(false)
+            }}
+          >
+            初期値に戻す
+          </Button>
+        </div>
+      ) : null}
     </div>
   )
 }

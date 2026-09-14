@@ -90,8 +90,11 @@ export type SavingEntry = {
 /** 試合を結合した積立。カスタム貯金では game が null になる */
 export type SavingEntryRow = SavingEntry & { game: Game | null }
 
+/**
+ * 貯金ルール。全アカウント共通で、DBには1行だけ置く（0017）。
+ * 変更できるのはマスターと、マスターが共有設定で変更を許可した相手だけ。
+ */
 export type SavingRules = {
-  user_id?: string
   win_amount: number
   draw_amount: number
   lose_amount: number
