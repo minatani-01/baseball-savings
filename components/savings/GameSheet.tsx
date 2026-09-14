@@ -38,6 +38,12 @@ type FormState = {
   opponent: string
   phase: Phase
   home_away: HomeAway
+  /**
+   * 球場は入力欄を置かない。日程・結果ページから取れるので、
+   * 自動取得がつながれば手で入れる必要がなくなる。
+   * ここで保持しているのは、過去に手入力された試合を編集したときに
+   * 既存の値を空で上書きしないようにするためだけである。
+   */
   stadium: string
   result: GameResult
   /**
@@ -130,6 +136,9 @@ export default function GameSheet({
     setForm((prev) => ({ ...prev, [key]: value }))
 
   const otherAmount = Math.max(0, Number.parseInt(form.other_amount || '0', 10) || 0)
+
+  const phaseRuleKey =
+    PHASES.find((p) => p.id === form.phase)?.ruleKey ?? 'multiplier_regular'
 
   const calc = useMemo(
     () =>
@@ -244,6 +253,25 @@ export default function GameSheet({
             />
           </Field>
 
+          {/*
+            倍率は選択肢の中ではなくラベル側に出す。
+            半分の幅だと「日本シリーズ ×1.5」が入り切らず、
+            閉じているときに倍率が切れて読めなくなるため。
+          */}
+          <Field label="フェーズ" hint={`×${Number(rules[phaseRuleKey]).toFixed(1)}`}>
+            <select
+              value={form.phase}
+              onChange={(e) => upd('phase', e.target.value as Phase)}
+              className={inputClassCompact}
+            >
+              {PHASES.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+
           <Field label="対戦相手">
             <select
               value={form.opponent}
@@ -257,34 +285,15 @@ export default function GameSheet({
               ))}
             </select>
           </Field>
-        </div>
 
-        <Field label="フェーズ" hint="倍率が変わります">
-          <select
-            value={form.phase}
-            onChange={(e) => upd('phase', e.target.value as Phase)}
-            className={inputClassCompact}
-          >
-            {PHASES.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}　×{Number(rules[p.ruleKey]).toFixed(1)}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="開催" hint="球場名は任意">
-          <div className="flex flex-col gap-2">
-            <Segmented value={form.home_away} options={HOME_AWAY} onChange={(v) => upd('home_away', v)} />
-            <input
-              type="text"
-              value={form.stadium}
-              onChange={(e) => upd('stadium', e.target.value)}
-              placeholder="ZOZOマリンスタジアム"
-              className={inputClassCompact}
+          <Field label="開催">
+            <Segmented
+              value={form.home_away}
+              options={HOME_AWAY}
+              onChange={(v) => upd('home_away', v)}
             />
-          </div>
-        </Field>
+          </Field>
+        </div>
 
         <Field label="試合結果" hint="スコアは任意">
           <div className="flex flex-col gap-2">
