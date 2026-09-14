@@ -23,7 +23,7 @@ export default async function MembersPage() {
   ])
   // 月間比較は接続相手が確定してからでないと引けないので、links の後に取る
   const [compare, myMonthTotal, goals] = await Promise.all([
-    getLinkMonthlyCompare(links, month),
+    getLinkMonthlyCompare(links, members, month),
     getMonthSavingTotal(user.id, month),
     getSharedGoals(),
   ])

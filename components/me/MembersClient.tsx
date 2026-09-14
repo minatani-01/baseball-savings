@@ -695,7 +695,7 @@ export default function MembersClient({
                 onChange={(next) => setJoinSaving(memberOf(permissionTarget)!, next)}
                 disabled={busy}
                 label="ロッテ貯金を合算する"
-                hint="総累計貯金額にこの人の分を足す"
+                hint="総累計貯金額と月間比較に、この人の分を入れる"
               />
               <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
                 割り勘はメンバーに載っていること自体が参加なので、設定はありません。
