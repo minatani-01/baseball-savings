@@ -7,7 +7,6 @@ import {
   Amount,
   Button,
   Card,
-  DeltaBadge,
   EmptyState,
   IconButton,
   IconFrame,
@@ -31,7 +30,7 @@ import GameSheet from '@/components/savings/GameSheet'
 import CustomSavingSheet from '@/components/savings/CustomSavingSheet'
 import { createClient } from '@/lib/supabase/client'
 import { BREAKDOWN_GROUP_LABEL, calcSaving, groupBreakdown } from '@/lib/savings'
-import { depositedTotal, monthOverMonth, notDepositedTotal } from '@/lib/insights'
+import { depositedTotal, notDepositedTotal } from '@/lib/insights'
 import { currentMonth, monthLabel, monthLabelEn, shortDate, yen } from '@/lib/format'
 import {
   MONTHLY_STATUS_LABEL,
@@ -106,7 +105,6 @@ export default function SavingsClient({
     () => notDepositedTotal(entries, monthlySavings),
     [entries, monthlySavings]
   )
-  const delta = useMemo(() => monthOverMonth(entries, month), [entries, month])
 
   const monthEntries = useMemo(
     () =>
@@ -253,9 +251,8 @@ export default function SavingsClient({
       {/* 累計 */}
       <Card className="glow">
         <div className="eyebrow">Total lotte savings</div>
-        <div className="mt-2 flex items-baseline gap-3">
+        <div className="mt-2">
           <Amount value={total} size="xl" tone="marine" />
-          <DeltaBadge percent={delta} />
         </div>
         <p className="mt-2 text-xs text-fg-mute">
           ワンバンクへ入金した金額の合計
