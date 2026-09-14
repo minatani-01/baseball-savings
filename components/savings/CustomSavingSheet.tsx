@@ -130,7 +130,7 @@ export default function CustomSavingSheet({
           </div>
         </Field>
 
-        <Field label="内容" hint="定型を選ぶと入ります。珍記録などは直接書いてください">
+        <Field label="その他" hint="定型を選ぶと入ります。珍記録などは直接書いてください">
           <input
             type="text"
             value={title}
