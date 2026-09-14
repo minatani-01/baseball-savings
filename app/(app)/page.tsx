@@ -7,7 +7,6 @@ import type { ChartPoint } from '@/components/charts/CumulativeChart'
 import {
   getMonthlySavings,
   getSavingEntries,
-  getSavingRules,
   getSessionUser,
   getSavingCircleTotals,
   getSplitRecords,
@@ -34,11 +33,11 @@ export default async function HomePage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const [entries, monthlySavings, records, rules, circle] = await Promise.all([
+  // ホームは貯金ルールを使わない（年間目標を外したため）。1クエリ減らす
+  const [entries, monthlySavings, records, circle] = await Promise.all([
     getSavingEntries(user.id),
     getMonthlySavings(user.id),
     getSplitRecords(user.id),
-    getSavingRules(),
     getSavingCircleTotals(),
   ])
 
@@ -152,16 +151,10 @@ export default async function HomePage() {
           </div>
         ) : null}
 
-        <div className="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-4">
+        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-4">
           <div>
             <div className="text-[10px] tracking-wider text-fg-mute">今月のつみたて額</div>
             <div className="tnum mt-1 text-lg font-semibold">{yen(monthTotal)}</div>
-          </div>
-          <div>
-            <div className="text-[10px] tracking-wider text-fg-mute">年間目標</div>
-            <div className="tnum mt-1 text-lg font-semibold text-marine">
-              {rules.annual_goal_amount > 0 ? yen(rules.annual_goal_amount) : '未設定'}
-            </div>
           </div>
           <div>
             <div className="text-[10px] tracking-wider text-fg-mute">継続日数</div>

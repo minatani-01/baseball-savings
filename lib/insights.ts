@@ -40,25 +40,6 @@ export function streakDays(entries: SavingEntryRow[]): number {
   return Math.floor((now - start) / 86_400_000) + 1
 }
 
-export type GoalProgress = {
-  goal: number
-  current: number
-  /** 0〜100 に丸めた進捗率。目標未設定なら null */
-  percent: number | null
-  remaining: number
-}
-
-export function goalProgress(current: number, goal: number): GoalProgress {
-  if (goal <= 0) return { goal: 0, current, percent: null, remaining: 0 }
-  return {
-    goal,
-    current,
-    percent: Math.min(100, Math.round((current / goal) * 100)),
-    remaining: Math.max(0, goal - current),
-  }
-}
-
-/** 年ごとの積立額 */
 export function sumByYear(entries: SavingEntryRow[]): { year: string; amount: number; count: number }[] {
   const years = new Map<string, { amount: number; count: number }>()
   for (const entry of entries) {

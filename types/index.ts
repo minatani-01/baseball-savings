@@ -114,8 +114,6 @@ export type SavingRules = {
   multiplier_interleague: number
   multiplier_cs: number
   multiplier_nippon_series: number
-  /** 年間の目標貯金額。0 は未設定（進捗バーを出さない） */
-  annual_goal_amount: number
 }
 
 /** 月末フロー。入金はワンバンク側で一度に終わるので中間状態は持たない */

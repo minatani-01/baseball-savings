@@ -25,7 +25,6 @@ export const DEFAULT_SAVING_RULES: SavingRules = {
   multiplier_interleague: 1.0,
   multiplier_cs: 1.2,
   multiplier_nippon_series: 1.5,
-  annual_goal_amount: 0,
 }
 
 /** 貯金額計算の入力に必要な試合情報だけを抜き出した型 */
