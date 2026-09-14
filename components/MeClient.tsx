@@ -153,19 +153,26 @@ export default function MeClient({
           <p className="mb-4 text-[11px] leading-relaxed text-fg-mute">
             Marine Wallet
             は資金を保有・移動しません。金額をコピーして各アプリで入金・送金する運用です。
-            起動URL（アプリのURLスキームやWebのURL）は端末ごとに異なるため、ここで設定します。
-            設定はこの端末のブラウザにのみ保存されます。
+            起動URLは既定値を組み込んであるので、設定しなくてもそのまま起動できます。
+            端末に合わせて変えたいときだけ書き換えてください。上書きはこの端末のブラウザにのみ保存され、
+            入力欄を空にして保存すると既定値に戻ります。
           </p>
           <div className="flex flex-col gap-4">
             {(Object.keys(EXTERNAL_APPS) as ExternalAppKey[]).map((key) => (
               <Field key={key} label={EXTERNAL_APPS[key].label} hint={EXTERNAL_APPS[key].hint}>
                 <input
-                  type="url"
+                  type="text"
+                  inputMode="url"
                   value={links[key] ?? ''}
                   onChange={(e) => updateLink(key, e.target.value)}
-                  placeholder="https:// または アプリのURLスキーム"
+                  placeholder={EXTERNAL_APPS[key].defaultUrl}
                   className={inputClass}
                 />
+                {EXTERNAL_APPS[key].note ? (
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-fg-mute">
+                    {EXTERNAL_APPS[key].note}
+                  </p>
+                ) : null}
               </Field>
             ))}
           </div>

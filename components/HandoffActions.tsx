@@ -6,7 +6,8 @@ import { APP_LINK_STORAGE_KEY, EXTERNAL_APPS, type ExternalAppKey } from '@/lib/
 
 export type AppLinks = Partial<Record<ExternalAppKey, string>>
 
-export function loadAppLinks(): AppLinks {
+/** この端末で上書きされた起動URLだけを返す（既定値は含まない） */
+export function loadAppLinkOverrides(): AppLinks {
   if (typeof window === 'undefined') return {}
   try {
     const raw = window.localStorage.getItem(APP_LINK_STORAGE_KEY)
@@ -16,11 +17,40 @@ export function loadAppLinks(): AppLinks {
   }
 }
 
+/**
+ * 実際に使う起動URL。端末ごとの上書きがあればそれを、無ければ組み込みの既定値を返す。
+ *
+ * 既定値をコードに持たせているので、新しい端末でも設定なしでそのまま起動できる。
+ * 端末によって最適なURLが違う場合（例: intent スキームは Android のみ）は
+ * マイページで上書きする。
+ */
+export function resolveAppUrl(app: ExternalAppKey): string {
+  const override = loadAppLinkOverrides()[app]?.trim()
+  return override || EXTERNAL_APPS[app].defaultUrl
+}
+
+/** マイページの入力欄に出す値。上書きが無ければ既定値を見せる */
+export function loadAppLinks(): AppLinks {
+  return {
+    onebank: resolveAppUrl('onebank'),
+    paypay: resolveAppUrl('paypay'),
+  }
+}
+
+/**
+ * 端末ごとの上書きを保存する。
+ * 既定値と同じ値や空欄は保存せず、既定値に戻す（入力欄を空にすれば初期化になる）。
+ */
 export function saveAppLinks(links: AppLinks) {
+  const overrides: AppLinks = {}
+  for (const key of Object.keys(EXTERNAL_APPS) as ExternalAppKey[]) {
+    const value = links[key]?.trim()
+    if (value && value !== EXTERNAL_APPS[key].defaultUrl) overrides[key] = value
+  }
   try {
-    window.localStorage.setItem(APP_LINK_STORAGE_KEY, JSON.stringify(links))
+    window.localStorage.setItem(APP_LINK_STORAGE_KEY, JSON.stringify(overrides))
   } catch {
-    /* localStorage が使えない環境では設定を保持しないだけで動作は継続する */
+    /* localStorage が使えない環境では上書きを保持しないだけで、既定値では動作する */
   }
 }
 
@@ -57,23 +87,20 @@ export function CopyAmountButton({ amount, label }: { amount: number; label?: st
   )
 }
 
-/** 外部アプリの起動。URL未設定ならマイページでの設定を促す。 */
+/**
+ * 外部アプリの起動。組み込みの既定URLがあるので、設定しなくても押せる。
+ *
+ * URL の解決は localStorage を読むためクライアント側でしか行えない。
+ * サーバー描画時とハイドレーション直後は既定値を使い、
+ * 端末の上書きがあればマウント後に差し替える。
+ */
 export function OpenAppButton({ app }: { app: ExternalAppKey }) {
-  const [url, setUrl] = useState<string | null>(null)
+  const meta = EXTERNAL_APPS[app]
+  const [url, setUrl] = useState(meta.defaultUrl)
 
   useEffect(() => {
-    setUrl(loadAppLinks()[app]?.trim() || null)
+    setUrl(resolveAppUrl(app))
   }, [app])
-
-  const meta = EXTERNAL_APPS[app]
-
-  if (!url) {
-    return (
-      <p className="text-xs text-fg-mute">
-        {meta.label}の起動URLはマイページから設定できます。
-      </p>
-    )
-  }
 
   return (
     <a

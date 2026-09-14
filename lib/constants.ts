@@ -101,20 +101,30 @@ export function categoryLabel(id: ExpenseCategory): string {
  * 外部金融アプリの起動先。
  * Marine Wallet 自身は資金を移動せず、金額をコピーして各アプリへ誘導するだけ（仕様書 11章・38章）。
  *
- * 起動URL（カスタムURLスキーム等）は端末とアプリのバージョンで変わるため、
- * ハードコードせずマイページから利用者が設定する。未設定なら起動ボタンは出さず、
- * 金額コピーのみを提供する。
+ * 起動URL は defaultUrl として組み込む。新しい端末でも設定なしでそのまま起動できる。
+ * 起動URL は端末とアプリのバージョンで変わり得るため、マイページから上書きできる
+ * （上書きはその端末のブラウザにのみ保存される。入力欄を空にすると既定値に戻る）。
  */
 export type ExternalAppKey = 'onebank' | 'paypay'
 
-export const EXTERNAL_APPS: Record<ExternalAppKey, { label: string; hint: string }> = {
+export const EXTERNAL_APPS: Record<
+  ExternalAppKey,
+  { label: string; hint: string; defaultUrl: string; note?: string }
+> = {
   onebank: {
     label: 'ワンバンク',
     hint: '月末の貯金入金に使うアプリの起動URL',
+    // Android の intent スキーム。アプリ未インストールなら
+    // browser_fallback_url で Google Play のページへ飛ぶ。
+    defaultUrl:
+      'intent://#Intent;package=jp.co.smartbank.b43;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Djp.co.smartbank.b43;end',
+    note: 'Android Chrome 向けの intent URL を既定にしています。iOS や PC では開けないため、その端末では上書きしてください。',
   },
   paypay: {
     label: 'PayPay',
     hint: '割り勘の精算に使うアプリの起動URL',
+    defaultUrl: 'paypay://',
+    note: 'iOS / Android 共通の URL スキームです。',
   },
 }
 
