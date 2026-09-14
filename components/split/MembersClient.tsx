@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Avatar, Button, Card, EmptyState, IconButton, SectionLabel, inputClass } from '@/components/ui'
-import { IconCheck, IconPlus, IconTrash } from '@/components/icons'
+import { IconCheck, IconLink, IconPlus, IconTrash } from '@/components/icons'
 import { createClient } from '@/lib/supabase/client'
 import type { SplitMember } from '@/types'
 
@@ -18,6 +18,35 @@ export default function MembersClient({
   const [newName, setNewName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 編集中の Marine ID（メンバーID -> 入力値）。保存するまでDBには書かない
+  const [draftIds, setDraftIds] = useState<Record<string, string>>({})
+  const [savedId, setSavedId] = useState<string | null>(null)
+
+  const draftOf = (member: SplitMember) => draftIds[member.id] ?? member.marine_id ?? ''
+
+  const saveMarineId = async (member: SplitMember) => {
+    const raw = draftOf(member).trim().toUpperCase()
+    // 空欄は「登録しない」。書式が違うものは DB の CHECK に弾かれる前にここで止める
+    if (raw !== '' && !/^MW-[0-9A-Z]{6}$/.test(raw)) {
+      setError('Marine ID は MW- に続く6文字で入力してください')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('split_members')
+      .update({ marine_id: raw === '' ? null : raw })
+      .eq('id', member.id)
+    setBusy(false)
+    if (error) {
+      setError('Marine ID の保存に失敗しました')
+      return
+    }
+    setSavedId(member.id)
+    setTimeout(() => setSavedId((prev) => (prev === member.id ? null : prev)), 1800)
+    router.refresh()
+  }
 
   const add = async () => {
     const name = newName.trim()
@@ -75,6 +104,9 @@ export default function MembersClient({
       <p className="text-[13px] leading-relaxed text-fg-mute">
         割り勘に参加するメンバーです。人数の上限はありません。
         名前を変更・削除しても、過去の記録に保存された名前と負担額は変わりません。
+        メンバーが Marine Wallet を使っているなら Marine ID を登録してください。
+        Marine Link で接続済みの相手なら、そのメンバーが参加している割り勘だけが相手から見えるようになります
+        （参加していない割り勘は見えません。相手が書き換えることもできません）。
       </p>
 
       <div>
@@ -110,6 +142,45 @@ export default function MembersClient({
                     <IconTrash size={15} />
                   </IconButton>
                 </div>
+
+                {/* Marine ID。登録するとこの人が参加した割り勘が相手から見えるようになる */}
+                {member.is_self ? null : (
+                  <div className="mt-2.5 border-t border-line pt-2.5">
+                    <div className="flex items-center gap-2">
+                      <IconLink size={15} className="shrink-0 text-fg-mute" />
+                      <input
+                        type="text"
+                        value={draftOf(member)}
+                        onChange={(e) => {
+                          setDraftIds((prev) => ({
+                            ...prev,
+                            [member.id]: e.target.value.toUpperCase(),
+                          }))
+                          setError(null)
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveMarineId(member)
+                        }}
+                        placeholder="Marine ID（未登録）"
+                        autoCapitalize="characters"
+                        spellCheck={false}
+                        className={`${inputClass} tnum !py-1.5 text-[13px] tracking-[0.1em]`}
+                      />
+                      <Button
+                        onClick={() => saveMarineId(member)}
+                        disabled={busy || draftOf(member) === (member.marine_id ?? '')}
+                        className="shrink-0 !min-h-[36px] !px-3 text-[12px]"
+                      >
+                        {savedId === member.id ? <IconCheck size={15} /> : '保存'}
+                      </Button>
+                    </div>
+                    {member.marine_id ? (
+                      <p className="mt-1.5 text-[11px] leading-relaxed text-teal">
+                        接続済みなら、このメンバーが参加している割り勘が相手から見えます。
+                      </p>
+                    ) : null}
+                  </div>
+                )}
               </Card>
             ))}
           </div>

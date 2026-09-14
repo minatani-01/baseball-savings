@@ -13,6 +13,7 @@ import type {
   Profile,
   SavingEntryRow,
   SavingRules,
+  SharedSplitRecord,
   SplitMember,
   SplitRecord,
 } from '@/types'
@@ -299,4 +300,37 @@ export async function getMonthSavingTotal(userId: string, month: string): Promis
     supabase.from('saving_entries').select('amount').eq('user_id', userId).eq('month', month)
   )
   return (rows ?? []).reduce((sum, row) => sum + row.amount, 0)
+}
+
+/**
+ * 相手から共有されている割り勘（0007）。
+ *
+ * 見えるのは「自分の Marine ID が登録されたメンバーとして参加している割り勘」だけで、
+ * その絞り込みは RLS が行う。ここでは自分以外の行を取りに行くだけでよい。
+ * 所有者の表示名は接続済みなら profiles から読める。
+ */
+export async function getSharedSplitRecords(userId: string): Promise<SharedSplitRecord[]> {
+  const supabase = await createClient()
+
+  const rows = await read<SplitRecord[]>('records', () =>
+    supabase
+      .from('records')
+      .select('*')
+      .neq('user_id', userId)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+  )
+  if (!rows || rows.length === 0) return []
+
+  const ownerIds = [...new Set(rows.map((r) => r.user_id))]
+  const owners = await read<Profile[]>('profiles', () =>
+    supabase.from('profiles').select('*').in('id', ownerIds)
+  )
+  const ownerById = new Map((owners ?? []).map((p) => [p.id, p]))
+
+  return rows.map((row) => ({
+    ...row,
+    owner_name: ownerById.get(row.user_id)?.display_name ?? '',
+    owner_marine_id: ownerById.get(row.user_id)?.marine_id ?? '',
+  }))
 }

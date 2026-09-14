@@ -133,8 +133,19 @@ export type SplitMember = {
   name: string
   is_self: boolean
   sort_order: number
+  /**
+   * このメンバーの Marine ID。登録すると、接続済みのそのアカウントから
+   * このメンバーが参加している割り勘だけが見えるようになる（0007のRLS）。
+   */
+  marine_id: string | null
   created_at: string
   updated_at: string
+}
+
+/** 相手から共有されている割り勘。誰のものかを表示するため所有者情報を添える */
+export type SharedSplitRecord = SplitRecord & {
+  owner_name: string
+  owner_marine_id: string
 }
 
 export type Share = {
