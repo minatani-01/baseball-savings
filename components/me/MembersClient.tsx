@@ -6,7 +6,6 @@ import {
   Amount,
   Button,
   Card,
-  Checkbox,
   EmptyState,
   IconButton,
   SectionLabel,
@@ -96,6 +95,10 @@ export default function MembersClient({
   const linkOf = (member: SplitMemberView) =>
     links.find((l) => sameId(l.partner_marine_id, member.marine_id)) ?? null
 
+  /** linkOf の逆引き。共有設定シートから、その人のメンバー行を引く */
+  const memberOf = (link: MarineLinkView) =>
+    members.find((m) => sameId(m.marine_id, link.partner_marine_id)) ?? null
+
   /** どのメンバーにも紐づいていない接続。メンバーへ取り込めるように別枠で出す */
   const unlistedLinks = useMemo(
     () =>
@@ -118,21 +121,27 @@ export default function MembersClient({
     }
   }
 
-  const setJoin = async (
-    member: SplitMemberView,
-    field: 'join_split' | 'join_saving',
-    next: boolean
-  ) => {
+  /**
+   * 総累計貯金額にその人を含めるかどうか。
+   *
+   * 共有設定（相手に自分のデータを見せるか）とは向きが違う。
+   * こちらは「自分の集計に相手を入れるか」なので、
+   * 相手が公開していても、こちらで外せば合算されない。
+   *
+   * 割り勘は、メンバーに載っていること自体が参加を意味するので設定を持たない
+   * （割り勘から外したいときはメンバーごと消す）。
+   */
+  const setJoinSaving = async (member: SplitMemberView, next: boolean) => {
     setBusy(true)
     setError(null)
     const supabase = createClient()
     const { error } = await supabase
       .from('split_members')
-      .update({ [field]: next })
+      .update({ join_saving: next })
       .eq('id', member.id)
     setBusy(false)
     if (error) {
-      setError('参加設定の保存に失敗しました')
+      setError('合算の設定を保存できませんでした')
       return
     }
     router.refresh()
@@ -516,22 +525,8 @@ export default function MembersClient({
                         ) : null}
                       </div>
 
-                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                        <span className="text-[11px] text-fg-mute">割り勘</span>
-                        <Checkbox
-                          checked={member.join_split}
-                          onChange={(next) => setJoin(member, 'join_split', next)}
-                          disabled={busy}
-                          label="共有する"
-                        />
-                        <span className="ml-2 text-[11px] text-fg-mute">貯金</span>
-                        <Checkbox
-                          checked={member.join_saving}
-                          onChange={(next) => setJoin(member, 'join_saving', next)}
-                          disabled={busy}
-                          label="合算する"
-                        />
-                        {member.avatar_path ? (
+                      {member.avatar_path ? (
+                        <div className="mt-2.5 flex">
                           <button
                             type="button"
                             onClick={() => removePhoto(member)}
@@ -540,8 +535,8 @@ export default function MembersClient({
                           >
                             写真を削除
                           </button>
-                        ) : null}
-                      </div>
+                        </div>
+                      ) : null}
 
                       {!member.marine_id ? (
                         <p className="mt-1.5 text-[11px] leading-relaxed text-fg-mute">
@@ -656,16 +651,16 @@ export default function MembersClient({
             {isMaster ? 'マスター権限のため、あなたが送ったリクエストは承認を待たずに接続されます。' : ''}
           </p>
           <p className="mt-2.5 text-[13px] leading-relaxed text-fg-mute">
-            割り勘はメンバー単位です。「割り勘 / 共有する」にチェックを入れると、その人が
-            参加している記録だけが相手から見えます（参加していない記録は見えません。相手が
-            書き換えることもできません）。貯金は接続単位で、接続していれば入金済みの月が
-            総累計貯金額に合算されます。合算から外したい相手だけ「貯金 / 合算する」の
-            チェックを外してください。何を相手に見せるかは、行の「共有設定」で項目ごとに選べます。
+            メンバーに載っている人が、割り勘の登場人物です。割り勘から外したいときは
+            メンバーごと削除してください。相手から見えるのは、その人が参加している記録だけです
+            （参加していない記録は見えません。相手が書き換えることもできません）。
+            何を相手に見せるか、相手の貯金を自分の総累計に合算するかは、
+            行の「共有設定」でまとめて選べます。
           </p>
         </Card>
       </div>
 
-      {/* 共有設定 */}
+      {/* 共有設定。link から、対応するメンバー行を引き当てて合算の設定も出す */}
       {permissionTarget ? (
         <Sheet
           title={`${partnerLabel(permissionTarget)} との共有設定`}
@@ -687,6 +682,27 @@ export default function MembersClient({
               />
             ))}
           </div>
+
+          {memberOf(permissionTarget) ? (
+            <div className="mt-5 border-t border-line pt-4">
+              <p className="eyebrow mb-1">あなたの集計に入れるもの</p>
+              <p className="mb-1 text-[11px] leading-relaxed text-fg-mute">
+                上とは向きが違い、相手のデータを自分の画面に入れるかどうかです。
+                相手が公開していても、ここを切れば合算されません。
+              </p>
+              <Toggle
+                checked={memberOf(permissionTarget)!.join_saving}
+                onChange={(next) => setJoinSaving(memberOf(permissionTarget)!, next)}
+                disabled={busy}
+                label="ロッテ貯金を合算する"
+                hint="総累計貯金額にこの人の分を足す"
+              />
+              <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
+                割り勘はメンバーに載っていること自体が参加なので、設定はありません。
+                外したいときはメンバーごと削除してください。
+              </p>
+            </div>
+          ) : null}
 
           <div className="mt-5 border-t border-line pt-4">
             <p className="eyebrow mb-2">相手があなたに公開しているもの</p>
