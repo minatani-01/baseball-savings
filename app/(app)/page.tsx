@@ -17,8 +17,8 @@ import {
   getSavingCircleTotals,
   getSplitRecords,
 } from '@/lib/queries'
-import { confirmedTotal, monthOverMonth, streakDays } from '@/lib/insights'
-import { currentMonth, isMonthClosed, monthLabel, shortDate, yen } from '@/lib/format'
+import { confirmedTotal, formatWinRate, monthOverMonth, seasonRecord, streakDays } from '@/lib/insights'
+import { currentMonth, isMonthClosed, monthLabel, shortDate, today, yen } from '@/lib/format'
 import { MONTHLY_STATUS_LABEL, opponentLabel, resultLabel } from '@/lib/constants'
 import type { ExpenseCategory, MonthlyStatus } from '@/types'
 
@@ -66,8 +66,8 @@ export default async function HomePage() {
   const delta = monthOverMonth(entries, month)
   const streak = streakDays(entries)
 
-  const monthly = monthlySavings.find((m) => m.month === month) ?? null
-  const status: MonthlyStatus = monthly?.status ?? 'calculating'
+  // 今季の戦績。貯金の記録に紐づく試合から数える（記録＝その年の試合そのもの）
+  const record = seasonRecord(entries, Number(today().slice(0, 4)))
 
   // 締めが終わっているのに入金まで進んでいない月をホームで先に促す
   // 締めが終わった月のうち、まだワンバンクへ入金していないもの。
@@ -207,11 +207,19 @@ export default async function HomePage() {
           <div className="mt-1 text-[11px] text-fg-mute">{unpaid.length}件</div>
         </Card>
         <Card>
-          <div className="text-[10px] tracking-wider text-fg-mute">今月の試合</div>
-          <div className="tnum mt-1.5 text-xl font-semibold">
-            {monthEntries.filter((e) => e.game).length} Games
+          {/* 試合数ではなく戦績を出す。登録は試合のあとになるので、
+              「何試合ぶん記録したか」より「今季どうだったか」の方が読む意味がある。
+              どこまでの結果かが分かるよう、最後に記録した試合の日付を添える */}
+          <div className="text-[10px] tracking-wider text-fg-mute">今季の勝率</div>
+          <div className="tnum mt-1.5 text-xl font-semibold">{formatWinRate(record.rate)}</div>
+          <div className="tnum mt-1 text-[11px] text-fg-mute">
+            {record.win}勝{record.lose}敗{record.draw}分
           </div>
-          <div className="mt-1 text-[11px] text-fg-mute">{MONTHLY_STATUS_LABEL[status]}</div>
+          {record.lastGameDate ? (
+            <div className="tnum mt-0.5 text-[11px] text-fg-mute">
+              {shortDate(record.lastGameDate)}まで
+            </div>
+          ) : null}
         </Card>
       </div>
 
