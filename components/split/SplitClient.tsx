@@ -22,7 +22,7 @@ import { CopyAmountButton, OpenAppButton } from '@/components/HandoffActions'
 import SplitSheet from '@/components/split/SplitSheet'
 import { createClient } from '@/lib/supabase/client'
 import { distributeEqual, simplifyDebts } from '@/lib/warikan'
-import { shortDate, yen } from '@/lib/format'
+import { dueYen, shortDate, yen } from '@/lib/format'
 import { categoryLabel } from '@/lib/constants'
 import type {
   Share,
@@ -71,7 +71,7 @@ export default function SplitClient({
   const unpaid = useMemo(() => records.filter((r) => r.status === 'unpaid'), [records])
   const paid = useMemo(() => records.filter((r) => r.status === 'paid'), [records])
 
-  const { paidTotals, transfers, unpaidTotal, settlementTotal, balancedTotal } = useMemo(() => {
+  const { dueTotals, transfers, unpaidTotal, settlementTotal, balancedTotal } = useMemo(() => {
     const paidMap = new Map<string, number>(memberNames.map((m) => [m, 0]))
     const burdenMap = new Map<string, number>(memberNames.map((m) => [m, 0]))
 
@@ -88,13 +88,22 @@ export default function SplitClient({
       balance: (paidMap.get(member) ?? 0) - (burdenMap.get(member) ?? 0),
     }))
 
+    // 未精算ぶんの「その人が払う金額」。負担した額から立替えた額を引く。
+    // 立替えの方が多い人はマイナス（＝受け取る側）になる。
+    const dueMap = new Map<string, number>(
+      [...names].map((member) => [
+        member,
+        (burdenMap.get(member) ?? 0) - (paidMap.get(member) ?? 0),
+      ])
+    )
+
     const transfers = simplifyDebts(balances)
     // 未精算レコードの総額と、そのうち実際に動かす必要がある金額（＝精算額）を分けて持つ
     const unpaidTotal = unpaid.reduce((sum, r) => sum + r.amount, 0)
     const settlementTotal = transfers.reduce((sum, t) => sum + t.amount, 0)
 
     return {
-      paidTotals: paidMap,
+      dueTotals: dueMap,
       transfers,
       unpaidTotal,
       settlementTotal,
@@ -156,7 +165,7 @@ export default function SplitClient({
             <IconUsers size={17} />
           </IconFrame>
           <div className="min-w-0 flex-1">
-            <div className="eyebrow">未精算の合計</div>
+            <div className="eyebrow">精算に必要な額</div>
             <div className="mt-1.5">
               <Amount value={settlementTotal} size="xl" tone="marine" />
             </div>
@@ -203,8 +212,17 @@ export default function SplitClient({
                   <span className="w-full truncate text-center text-[11px] text-fg-dim">
                     {m.is_self ? 'あなた' : m.name}
                   </span>
-                  <span className="tnum text-center text-[11px] text-fg-mute">
-                    {yen(paidTotals.get(m.name) ?? 0)}
+                  {/* その人が払う金額。受け取る側はマイナスで出す */}
+                  <span
+                    className={`tnum text-center text-[11px] ${
+                      (dueTotals.get(m.name) ?? 0) < 0
+                        ? 'text-teal'
+                        : (dueTotals.get(m.name) ?? 0) > 0
+                          ? 'text-fg-dim'
+                          : 'text-fg-mute'
+                    }`}
+                  >
+                    {dueYen(dueTotals.get(m.name) ?? 0)}
                   </span>
                 </div>
               ))}
@@ -221,6 +239,12 @@ export default function SplitClient({
               </Link>
             </div>
           )}
+          {members.length > 0 ? (
+            <p className="mt-3 border-t border-line pt-3 text-[11px] leading-relaxed text-fg-mute">
+              金額は未精算ぶんの精算額です。プラスはその人が払う金額、
+              マイナスは受け取る金額を表します。
+            </p>
+          ) : null}
         </Card>
       </div>
 

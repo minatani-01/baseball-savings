@@ -200,7 +200,9 @@ export default async function HomePage() {
       {/* 未精算 */}
       <div className="grid grid-cols-2 gap-2">
         <Card>
-          <div className="text-[10px] tracking-wider text-fg-mute">未精算</div>
+          {/* 割り勘タブの「精算に必要な額」とは別物（こちらは立替の総額）なので、
+              同じ「未精算」で並べず名前で区別する */}
+          <div className="text-[10px] tracking-wider text-fg-mute">未精算の立替</div>
           <div className="tnum mt-1.5 text-xl font-semibold">{yen(unpaidTotal)}</div>
           <div className="mt-1 text-[11px] text-fg-mute">{unpaid.length}件</div>
         </Card>

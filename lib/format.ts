@@ -3,6 +3,15 @@ export function yen(amount: number): string {
   return `¥${Math.round(amount).toLocaleString('ja-JP')}`
 }
 
+/**
+ * 割り勘の精算額。払う側はそのまま、受け取る側はマイナスで表す（-¥1,200）。
+ * yen() にそのまま負数を渡すと「¥-1,200」になり、符号が金額の中に埋もれて読みにくい。
+ */
+export function dueYen(amount: number): string {
+  const n = Math.round(amount)
+  return n < 0 ? `-${yen(-n)}` : yen(n)
+}
+
 /** 金額を符号付きにする（+¥500 / -¥500） */
 export function signedYen(amount: number): string {
   const sign = amount < 0 ? '-' : '+'
