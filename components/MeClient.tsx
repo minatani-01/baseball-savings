@@ -13,9 +13,7 @@ import {
   IconLogout,
   IconUsers,
 } from '@/components/icons'
-import { loadAppLinks, saveAppLinks, type AppLinks } from '@/components/HandoffActions'
 import { createClient } from '@/lib/supabase/client'
-import { EXTERNAL_APPS, type ExternalAppKey } from '@/lib/constants'
 import type { Profile } from '@/types'
 
 export default function MeClient({
@@ -30,16 +28,10 @@ export default function MeClient({
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(initialProfile)
   const [displayName, setDisplayName] = useState(initialProfile?.display_name ?? '')
-  const [links, setLinks] = useState<AppLinks>({})
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileSaved, setProfileSaved] = useState(false)
-  const [linksSaved, setLinksSaved] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    setLinks(loadAppLinks())
-  }, [])
 
   // Marine ID はプロフィール行の作成時に採番される。未作成なら初回訪問時に作る。
   useEffect(() => {
@@ -95,11 +87,6 @@ export default function MeClient({
     }
   }
 
-  const updateLink = (key: ExternalAppKey, value: string) => {
-    setLinks((prev) => ({ ...prev, [key]: value }))
-    setLinksSaved(false)
-  }
-
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -153,50 +140,15 @@ export default function MeClient({
               </Button>
             </div>
           </div>
-        </Card>
-      </div>
 
-      <div>
-        <SectionLabel>外部アプリ連携</SectionLabel>
-        <Card>
-          <p className="mb-4 text-[11px] leading-relaxed text-fg-mute">
-            Marine Wallet
-            は資金を保有・移動しません。金額をコピーして各アプリで入金・送金する運用です。
-            起動URLは既定値を組み込んであるので、設定しなくてもそのまま起動できます。
-            端末に合わせて変えたいときだけ書き換えてください。上書きはこの端末のブラウザにのみ保存され、
-            入力欄を空にして保存すると既定値に戻ります。
-          </p>
-          <div className="flex flex-col gap-4">
-            {(Object.keys(EXTERNAL_APPS) as ExternalAppKey[]).map((key) => (
-              <Field key={key} label={EXTERNAL_APPS[key].label} hint={EXTERNAL_APPS[key].hint}>
-                <input
-                  type="text"
-                  inputMode="url"
-                  value={links[key] ?? ''}
-                  onChange={(e) => updateLink(key, e.target.value)}
-                  placeholder={EXTERNAL_APPS[key].defaultUrl}
-                  className={inputClass}
-                />
-                {EXTERNAL_APPS[key].note ? (
-                  <p className="mt-1.5 text-[11px] leading-relaxed text-fg-mute">
-                    {EXTERNAL_APPS[key].note}
-                  </p>
-                ) : null}
-              </Field>
-            ))}
-          </div>
-          <div className="mt-4 flex flex-col gap-2">
-            {linksSaved ? <p className="text-[13px] text-teal">保存しました</p> : null}
-            <Button
-              full
-              onClick={() => {
-                saveAppLinks(links)
-                setLinksSaved(true)
-              }}
-            >
-              起動URLを保存
+          {/* ログアウトはアカウント操作なのでここに置く。
+              画面の末尾に置くと他のセクションの下に埋もれて見つからない */}
+          <form action="/auth/signout" method="post" className="mt-4 border-t border-line pt-4">
+            <Button type="submit" variant="danger" full>
+              <IconLogout size={17} />
+              ログアウト
             </Button>
-          </div>
+          </form>
         </Card>
       </div>
 
@@ -253,13 +205,6 @@ export default function MeClient({
       </div>
 
       {error ? <p className="text-[13px] text-danger">{error}</p> : null}
-
-      <form action="/auth/signout" method="post">
-        <Button type="submit" variant="danger" full>
-          <IconLogout size={17} />
-          ログアウト
-        </Button>
-      </form>
 
       <p className="pb-2 text-center text-[11px] text-fg-mute">
         Marine Wallet / 完全個人利用・非商用
