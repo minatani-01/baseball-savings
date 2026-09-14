@@ -162,6 +162,7 @@ export default function SplitClient({
           action={
             <Link
               href="/split/members"
+              prefetch={false}
               className="inline-flex items-center gap-1 text-[12px] text-fg-dim hover:text-marine"
             >
               編集
@@ -191,6 +192,7 @@ export default function SplitClient({
               ))}
               <Link
                 href="/split/members"
+                prefetch={false}
                 aria-label="メンバーを追加"
                 className="flex w-16 shrink-0 flex-col items-center gap-1.5"
               >

@@ -155,6 +155,7 @@ export default function SavingsClient({
           action={
             <Link
               href="/savings/rules"
+              prefetch={false}
               className="inline-flex items-center gap-1.5 text-[12px] text-fg-dim hover:text-marine"
             >
               <IconRules size={15} />

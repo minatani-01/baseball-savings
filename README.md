@@ -84,6 +84,16 @@ Vercel のプロジェクト設定で以下を差し替えてください。
 - **ワンバンク入金は月末に1回**。`monthly_savings` が
   `calculating → ready → deposit_pending → deposited` の状態を管理します。
 - **UIに絵文字は使わない**（仕様書 4.1）。アイコンはすべて `components/icons.tsx` の SVG ラインアイコンです。
+- **読み取りに失敗したら金額を表示しない**。`lib/queries.ts` は取得エラーを握りつぶさず
+  `QueryError` を投げ、`app/(app)/error.tsx` が再読み込みを促します。
+  Supabase の Free プランはアイドル後の初回アクセスで 504 を返すことがあるため、
+  読み取りは1回だけ自動で再試行します（読み取りは冪等なので安全）。
+- **認証はローカルで検証する**。`getUser()` は毎回 Auth サーバーへ往復するため、
+  `proxy.ts` と `lib/queries.ts` では `getClaims()` を使い、JWT（ES256）の署名を
+  JWKS でローカル検証します。サーバークライアントと `getSessionUser()` は
+  React の `cache()` でリクエスト単位に共有します。
+- **下部ナビをプリフェッチしない**。5タブが常に画面内にあるため、既定のままだと
+  1画面開くごとに他タブぶんの RSC がサーバー描画され、そのぶんクエリも走ります。
 
 ## スクリプト
 

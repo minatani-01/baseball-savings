@@ -65,7 +65,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 {header.title}
               </span>
             ) : (
-              <Link href="/" className="min-w-0">
+              <Link href="/" prefetch={false} className="min-w-0">
                 <Brand />
               </Link>
             )}
@@ -75,6 +75,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             {header ? null : (
               <Link
                 href="/me#notifications"
+                prefetch={false}
                 aria-label="お知らせ"
                 className="flex h-10 w-10 items-center justify-center rounded-lg text-fg-dim transition-colors hover:text-marine"
               >
@@ -95,6 +96,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={href}
                 href={href}
+                // 5タブが常に画面内にあるため、既定のプリフェッチだと1画面開くたびに
+                // 他4タブぶんの RSC がサーバーで丸ごと描画され、そのぶん Supabase への
+                // クエリも走る。5タブとも動的かつ個人データなので、先読みしても
+                // 使われないことが多い。タップ時に取りに行く方が総コストが小さい。
+                prefetch={false}
                 aria-current={active ? 'page' : undefined}
                 className={`flex flex-1 flex-col items-center gap-1 pt-2.5 pb-[max(10px,env(safe-area-inset-bottom))] transition-colors ${
                   active ? 'text-marine' : 'text-fg-mute hover:text-fg-dim'
