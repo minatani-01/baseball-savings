@@ -159,9 +159,9 @@ export default async function HomePage() {
             <div className="tnum mt-1 text-lg font-semibold">{yen(monthTotal)}</div>
           </div>
           <div>
-            <div className="text-[10px] tracking-wider text-fg-mute">目標金額</div>
+            <div className="text-[10px] tracking-wider text-fg-mute">年間目標</div>
             <div className="tnum mt-1 text-lg font-semibold text-marine">
-              {rules.monthly_goal_amount > 0 ? yen(rules.monthly_goal_amount) : '未設定'}
+              {rules.annual_goal_amount > 0 ? yen(rules.annual_goal_amount) : '未設定'}
             </div>
           </div>
           <div>

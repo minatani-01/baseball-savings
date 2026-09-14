@@ -141,7 +141,7 @@ export const LINK_RESOURCE_META: {
   hint: string
 }[] = [
   { id: 'saving', label: 'ロッテ貯金', hint: '積立の明細と月ごとの合計' },
-  { id: 'saving_rules', label: '貯金ルール', hint: '勝利・HRなどの金額設定と月間目標' },
+  { id: 'saving_rules', label: '貯金ルール', hint: '勝利・HRなどの金額設定と年間目標' },
   { id: 'monthly', label: '月末入金状況', hint: '月末の確定額とワンバンク入金の進捗' },
   { id: 'split', label: '割り勘', hint: '立替の記録と精算状況' },
 ]

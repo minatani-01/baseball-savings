@@ -99,7 +99,15 @@ export default function SavingsClient({
     [monthEntries]
   )
 
-  const goal = goalProgress(monthTotal, rules.monthly_goal_amount)
+  // 目標は年単位。進捗は「その年の確定した月」の合計で見る。
+  // 累計貯金額と同じ定義にそろえる（未確定の今月を混ぜると、同じ画面の中で
+  // 数字の基準が2つになり、どちらが本当なのか読めなくなる）
+  const year = month.slice(0, 4)
+  const yearConfirmed = useMemo(
+    () => confirmedTotal(monthlySavings.filter((m) => m.month.startsWith(`${year}-`))),
+    [monthlySavings, year]
+  )
+  const goal = goalProgress(yearConfirmed, rules.annual_goal_amount)
 
   const groups = useMemo(() => {
     const totals: Record<string, number> = { result: 0, batting: 0, pitching: 0, other: 0 }
@@ -263,7 +271,7 @@ export default function SavingsClient({
               <ProgressBar
                 value={goal.current}
                 max={goal.goal}
-                label="目標金額"
+                label={`${year}年の目標`}
                 caption={`${yen(goal.current)} / ${yen(goal.goal)}`}
               />
             </div>
