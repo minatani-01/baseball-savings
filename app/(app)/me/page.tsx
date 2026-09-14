@@ -16,6 +16,7 @@ export default async function MePage() {
       email={user.email ?? ''}
       initialProfile={profile}
       avatarUrl={avatarUrl}
+      signInMethod={user.signInMethod}
     />
   )
 }

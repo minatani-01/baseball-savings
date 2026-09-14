@@ -89,7 +89,12 @@ async function read<T>(table: string, run: () => PromiseLike<SupabaseResult<T>>)
   throw new QueryError(table, lastError?.message ?? 'unknown error', lastError?.code ?? '')
 }
 
-export type SessionUser = { id: string; email: string }
+export type SessionUser = {
+  id: string
+  email: string
+  /** ログインに使っている方法の表示名（'Google' / 'メールアドレス'） */
+  signInMethod: string
+}
 
 /**
  * ログイン中のユーザー。layout と page の両方から呼ばれるので cache() で1回にまとめる。
@@ -99,6 +104,36 @@ export type SessionUser = { id: string; email: string }
  * JWKS を取得済みのインスタンスではネットワーク往復が発生しない。
  * ここで必要なのは id と email だけで、いずれも JWT のクレームに含まれる。
  */
+/** OAuth プロバイダの表示名。増えたらここに足す */
+const PROVIDER_LABEL: Record<string, string> = { google: 'Google' }
+
+/**
+ * 「どうやってログインしているか」を JWT から読む。
+ *
+ * app_metadata.provider は “アカウントを最初に作ったときの方法” なので、
+ * あとから Google を紐付けた人は Google で入っていても 'email' のままになる。
+ * そこで amr（このセッションで実際に使った認証方法）を先に見る。
+ * amr が読めない場合だけ、紐付いているプロバイダから推測する。
+ */
+function signInMethodLabel(claims: Record<string, unknown>): string {
+  const appMeta = claims.app_metadata as { provider?: unknown; providers?: unknown } | undefined
+  const providers = Array.isArray(appMeta?.providers)
+    ? appMeta.providers.filter((p): p is string => typeof p === 'string')
+    : typeof appMeta?.provider === 'string'
+      ? [appMeta.provider]
+      : []
+  const oauth = providers.find((p) => p !== 'email' && p !== 'phone')
+  const oauthLabel = oauth ? (PROVIDER_LABEL[oauth] ?? oauth) : null
+
+  const amr = Array.isArray(claims.amr) ? claims.amr : []
+  const last = amr[amr.length - 1] as { method?: unknown } | undefined
+  const method = typeof last?.method === 'string' ? last.method : null
+
+  // メール/パスワード・マジックリンク・ワンタイムコードは、どれもメールでの認証
+  if (method === 'password' || method === 'magiclink' || method === 'otp') return 'メールアドレス'
+  return oauthLabel ?? 'メールアドレス'
+}
+
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const supabase = await createClient()
   const { data, error } = await supabase.auth.getClaims()
@@ -107,6 +142,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   return {
     id: claims.sub,
     email: typeof claims.email === 'string' ? claims.email : '',
+    signInMethod: signInMethodLabel(claims as unknown as Record<string, unknown>),
   }
 })
 

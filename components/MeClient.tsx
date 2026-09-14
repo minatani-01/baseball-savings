@@ -23,12 +23,15 @@ export default function MeClient({
   email,
   initialProfile,
   avatarUrl,
+  signInMethod,
 }: {
   userId: string
   email: string
   initialProfile: Profile | null
   /** プロフィールアイコンの署名付きURL。未設定・発行失敗のときは null */
   avatarUrl: string | null
+  /** ログインに使っている方法の表示名（'Google' / 'メールアドレス'） */
+  signInMethod: string
 }) {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(initialProfile)
@@ -223,7 +226,9 @@ export default function MeClient({
           ) : null}
 
           <div className="divide-hairline border-t border-line pt-4">
-            <Row label="メールアドレス" value={email} />
+            {/* Google で入っているなら「Google」と出す。
+                どのアカウントで入っているかが分かるよう、値はメールアドレスのまま */}
+            <Row label={signInMethod} value={email} />
           </div>
           <div className="mt-4 border-t border-line pt-4">
             <Field label="表示名">
