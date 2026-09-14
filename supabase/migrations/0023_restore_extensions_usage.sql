@@ -1,0 +1,25 @@
+-- ============================================================================
+-- Marine Wallet / 0023_restore_extensions_usage
+-- ----------------------------------------------------------------------------
+-- extensions スキーマへの USAGE を anon / authenticated に戻す。
+--
+-- 経緯:
+--   NPB のページ構造を調べるために http 拡張を一時的に入れた際、
+--   アプリの API から呼べないようにするつもりで
+--   `revoke all on schema extensions from anon, authenticated` を実行した。
+--   これはスキーマ全体の USAGE を落とすため、同じスキーマにある
+--   pgcrypto の gen_random_uuid() などが一般ユーザーから使えなくなり、
+--   本番のアプリがデータを読み書きできなくなった。
+--
+--   Supabase の既定では extensions スキーマの USAGE は
+--   anon / authenticated / service_role に付いている。それに戻す。
+--
+-- 教訓:
+--   スキーマ単位の revoke は、そこに同居する他の拡張まで巻き込む。
+--   特定の関数だけを締めたいときは、関数単位で revoke すること
+--   （このときも http% の関数は個別に revoke しており、そちらで足りていた）。
+--
+-- 冪等性: 何度実行しても安全。
+-- ============================================================================
+
+grant usage on schema extensions to anon, authenticated, service_role;
