@@ -5,22 +5,23 @@ import { useRouter } from 'next/navigation'
 import {
   Amount,
   Button,
-  Chip,
   Field,
+  InlineRow,
   Row,
   Segmented,
   Sheet,
-  inputClass,
+  Stepper,
+  Switch,
+  inputClassCompact,
 } from '@/components/ui'
-import { IconMinus, IconPlus } from '@/components/icons'
 import { createClient } from '@/lib/supabase/client'
 import { calcSaving } from '@/lib/savings'
 import { today } from '@/lib/format'
 import {
+  AUTO_PITCHING_HIGHLIGHTS,
   HOME_AWAY,
   OPPONENTS,
   PHASES,
-  PITCHING_HIGHLIGHTS,
   RESULTS,
 } from '@/lib/constants'
 import type {
@@ -39,17 +40,20 @@ type FormState = {
   home_away: HomeAway
   stadium: string
   result: GameResult
+  /**
+   * サヨナラ勝利・ノーヒットノーラン・完全試合・その他ボーナスは、
+   * NPB 公式から取得できないため自動登録では扱わない
+   * （カスタム登録で積み立てる）。
+   *
+   * 以下の項目を状態に残しているのは、過去に手入力された試合を
+   * 編集したときに既存の値をゼロで上書きしないようにするためだけである。
+   */
   is_sayonara: boolean
   marines_score: string
   opponent_score: string
   home_runs: number
   grand_slams: number
-  /**
-   * マルチ安打と打点は NPB 公式が1試合ごとの個人成績を公開していないため、
-   * 自動登録では扱わない（カスタム登録で積み立てる）。
-   * ここで保持しているのは、過去に手入力された試合を編集したときに
-   * 既存の値をゼロで上書きしないようにするためだけである。
-   */
+  /** マルチ安打と打点も同じ理由で自動登録では扱わない */
   multi_hits: number
   rbi: number
   pitching_highlight: PitchingHighlight
@@ -104,79 +108,6 @@ function toForm(entry: SavingEntryRow | null): FormState {
     other_amount: String(entry.other_amount ?? 0),
     other_note: entry.other_note ?? '',
   }
-}
-
-function Counter({
-  label,
-  hint,
-  value,
-  onChange,
-}: {
-  label: string
-  hint: string
-  value: number
-  onChange: (next: number) => void
-}) {
-  return (
-    <div className="flex-1 rounded-xl border border-line bg-white/[0.02] p-3">
-      <div className="text-[12px] text-fg-dim">{label}</div>
-      <div className="text-[10px] text-fg-mute">{hint}</div>
-      <div className="mt-2 flex items-center gap-2">
-        <button
-          type="button"
-          aria-label={`${label}を減らす`}
-          onClick={() => onChange(Math.max(0, value - 1))}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-fg-dim hover:border-marine/50 hover:text-marine"
-        >
-          <IconMinus size={16} />
-        </button>
-        <span className="tnum flex-1 text-center text-xl font-semibold">{value}</span>
-        <button
-          type="button"
-          aria-label={`${label}を増やす`}
-          onClick={() => onChange(value + 1)}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-fg-dim hover:border-marine/50 hover:text-marine"
-        >
-          <IconPlus size={16} />
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function Toggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string
-  checked: boolean
-  onChange: (next: boolean) => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`flex min-h-[46px] w-full items-center justify-between rounded-xl border px-3.5 transition-colors ${
-        checked ? 'border-marine/70 bg-marine/10 text-marine' : 'border-line bg-white/[0.02] text-fg-dim'
-      }`}
-    >
-      <span className="text-sm">{label}</span>
-      <span
-        className={`relative h-5 w-9 rounded-full transition-colors ${
-          checked ? 'bg-marine' : 'bg-line'
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 h-4 w-4 rounded-full bg-ink transition-all ${
-            checked ? 'left-[18px]' : 'left-0.5'
-          }`}
-        />
-      </span>
-    </button>
-  )
 }
 
 export default function GameSheet({
@@ -302,28 +233,44 @@ export default function GameSheet({
         </div>
       }
     >
-      <div className="flex flex-col gap-5">
-        <Field label="試合日">
-          <input
-            type="date"
-            value={form.game_date}
-            onChange={(e) => upd('game_date', e.target.value)}
-            className={inputClass}
-          />
-        </Field>
+      <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="試合日">
+            <input
+              type="date"
+              value={form.game_date}
+              onChange={(e) => upd('game_date', e.target.value)}
+              className={inputClassCompact}
+            />
+          </Field>
 
-        <Field label="対戦相手">
-          <div className="grid grid-cols-3 gap-2">
-            {OPPONENTS.map((o) => (
-              <Chip
-                key={o.id}
-                selected={form.opponent === o.id}
-                onClick={() => upd('opponent', o.id)}
-              >
-                {o.label}
-              </Chip>
+          <Field label="対戦相手">
+            <select
+              value={form.opponent}
+              onChange={(e) => upd('opponent', e.target.value)}
+              className={inputClassCompact}
+            >
+              {OPPONENTS.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+
+        <Field label="フェーズ" hint="倍率が変わります">
+          <select
+            value={form.phase}
+            onChange={(e) => upd('phase', e.target.value as Phase)}
+            className={inputClassCompact}
+          >
+            {PHASES.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}　×{Number(rules[p.ruleKey]).toFixed(1)}
+              </option>
             ))}
-          </div>
+          </select>
         </Field>
 
         <Field label="開催" hint="球場名は任意">
@@ -334,90 +281,54 @@ export default function GameSheet({
               value={form.stadium}
               onChange={(e) => upd('stadium', e.target.value)}
               placeholder="ZOZOマリンスタジアム"
-              className={inputClass}
+              className={inputClassCompact}
             />
           </div>
         </Field>
 
-        <Field label="フェーズ" hint="倍率が変わります">
-          <div className="grid grid-cols-4 gap-2">
-            {PHASES.map((p) => (
-              <Chip
-                key={p.id}
-                selected={form.phase === p.id}
-                onClick={() => upd('phase', p.id)}
-                sub={`×${Number(rules[p.ruleKey]).toFixed(1)}`}
-              >
-                {p.label}
-              </Chip>
-            ))}
-          </div>
-        </Field>
-
-        <Field label="試合結果">
+        <Field label="試合結果" hint="スコアは任意">
           <div className="flex flex-col gap-2">
-            <div className="grid grid-cols-3 gap-2">
-              {RESULTS.map((r) => (
-                <Chip
-                  key={r.id}
-                  selected={form.result === r.id}
-                  onClick={() => {
-                    upd('result', r.id)
-                    if (r.id !== 'win') upd('is_sayonara', false)
-                  }}
-                >
-                  {r.label}
-                </Chip>
-              ))}
-            </div>
-            {form.result === 'win' ? (
-              <Toggle
-                label="サヨナラ勝利"
-                checked={form.is_sayonara}
-                onChange={(v) => upd('is_sayonara', v)}
+            <Segmented value={form.result} options={RESULTS} onChange={(v) => upd('result', v)} />
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={form.marines_score}
+                onChange={(e) => upd('marines_score', e.target.value)}
+                placeholder="MARINES"
+                className={`${inputClassCompact} tnum text-center`}
               />
-            ) : null}
-          </div>
-        </Field>
-
-        <Field label="スコア" hint="任意">
-          <div className="flex items-center gap-3">
-            <input
-              type="number"
-              inputMode="numeric"
-              min={0}
-              value={form.marines_score}
-              onChange={(e) => upd('marines_score', e.target.value)}
-              placeholder="MARINES"
-              className={`${inputClass} tnum text-center`}
-            />
-            <span className="text-fg-mute">-</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={0}
-              value={form.opponent_score}
-              onChange={(e) => upd('opponent_score', e.target.value)}
-              placeholder="OPPONENT"
-              className={`${inputClass} tnum text-center`}
-            />
+              <span className="text-fg-mute">-</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={form.opponent_score}
+                onChange={(e) => upd('opponent_score', e.target.value)}
+                placeholder="OPPONENT"
+                className={`${inputClassCompact} tnum text-center`}
+              />
+            </div>
           </div>
         </Field>
 
         <Field label="打撃ボーナス" hint="満塁HRはホームランに含めず別に数える">
-          <div className="flex gap-3">
-            <Counter
-              label="ホームラン"
-              hint={`+¥${rules.home_run_amount}/本`}
-              value={form.home_runs}
-              onChange={(v) => upd('home_runs', v)}
-            />
-            <Counter
-              label="満塁ホームラン"
-              hint={`+¥${rules.grand_slam_amount}/本`}
-              value={form.grand_slams}
-              onChange={(v) => upd('grand_slams', v)}
-            />
+          <div className="flex flex-col gap-2">
+            <InlineRow label="ホームラン" hint={`+¥${rules.home_run_amount}/本`}>
+              <Stepper
+                label="ホームラン"
+                value={form.home_runs}
+                onChange={(v) => upd('home_runs', v)}
+              />
+            </InlineRow>
+            <InlineRow label="満塁ホームラン" hint={`+¥${rules.grand_slam_amount}/本`}>
+              <Stepper
+                label="満塁ホームラン"
+                value={form.grand_slams}
+                onChange={(v) => upd('grand_slams', v)}
+              />
+            </InlineRow>
           </div>
         </Field>
 
@@ -426,43 +337,24 @@ export default function GameSheet({
             <select
               value={form.pitching_highlight}
               onChange={(e) => upd('pitching_highlight', e.target.value as PitchingHighlight)}
-              className={inputClass}
+              className={inputClassCompact}
             >
-              {PITCHING_HIGHLIGHTS.map((p) => (
+              {AUTO_PITCHING_HIGHLIGHTS.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.label}
                 </option>
               ))}
             </select>
-            <Toggle
-              label="勝利投手"
-              checked={form.is_winning_pitcher}
-              onChange={(v) => upd('is_winning_pitcher', v)}
-            />
-            <Toggle label="セーブ" checked={form.has_save} onChange={(v) => upd('has_save', v)} />
-          </div>
-        </Field>
-
-        <Field label="その他ボーナス" hint="珍記録など">
-          <div className="flex flex-col gap-2">
-            <input
-              type="text"
-              value={form.other_note}
-              onChange={(e) => upd('other_note', e.target.value)}
-              placeholder="例: 代打逆転満塁ホームラン"
-              className={inputClass}
-            />
-            <div className="grid grid-cols-4 gap-2">
-              {[0, 100, 500, 1000].map((amount) => (
-                <Chip
-                  key={amount}
-                  selected={otherAmount === amount}
-                  onClick={() => upd('other_amount', String(amount))}
-                >
-                  {amount === 0 ? 'なし' : `¥${amount}`}
-                </Chip>
-              ))}
-            </div>
+            <InlineRow label="勝利投手" hint={`+¥${rules.winning_pitcher_amount}`}>
+              <Switch
+                label="勝利投手"
+                checked={form.is_winning_pitcher}
+                onChange={(v) => upd('is_winning_pitcher', v)}
+              />
+            </InlineRow>
+            <InlineRow label="セーブ" hint={`+¥${rules.save_amount}`}>
+              <Switch label="セーブ" checked={form.has_save} onChange={(v) => upd('has_save', v)} />
+            </InlineRow>
           </div>
         </Field>
 

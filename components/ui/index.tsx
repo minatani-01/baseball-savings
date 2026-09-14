@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { IconCheck, IconClose } from '@/components/icons'
+import { IconCheck, IconClose, IconMinus, IconPlus } from '@/components/icons'
 import { yen } from '@/lib/format'
 
 // ---------------------------------------------------------------- Card ----
@@ -210,6 +210,100 @@ export function Field({
 
 export const inputClass =
   'w-full rounded-xl border border-line bg-ink-2/80 px-3.5 py-2.5 text-fg outline-none transition-colors placeholder:text-fg-mute focus:border-marine/70'
+
+/** inputClass の高さを詰めたもの。入力欄が続く画面で使う */
+export const inputClassCompact =
+  'w-full rounded-lg border border-line bg-ink-2/80 px-3 py-2 text-[14px] text-fg outline-none transition-colors placeholder:text-fg-mute focus:border-marine/70'
+
+/**
+ * ラベルと操作を1行に収める行。
+ *
+ * 縦に積むと1項目で3行使ってしまう画面向け。
+ * 44px を下回らないようにして、指で押せる大きさは保つ。
+ */
+export function InlineRow({
+  label,
+  hint,
+  children,
+}: {
+  label: string
+  hint?: string
+  children: ReactNode
+}) {
+  return (
+    <div className="flex min-h-[44px] items-center justify-between gap-3 rounded-lg border border-line bg-white/[0.02] px-3 py-1.5">
+      <div className="min-w-0">
+        <div className="truncate text-[13px] text-fg-dim">{label}</div>
+        {hint ? <div className="truncate text-[10px] text-fg-mute">{hint}</div> : null}
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
+  )
+}
+
+/** InlineRow の中に置く、増減ボタン付きの数値 */
+export function Stepper({
+  label,
+  value,
+  onChange,
+  min = 0,
+}: {
+  label: string
+  value: number
+  onChange: (next: number) => void
+  min?: number
+}) {
+  const step = (delta: number) => onChange(Math.max(min, value + delta))
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        aria-label={`${label}を減らす`}
+        onClick={() => step(-1)}
+        className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-fg-dim transition-colors hover:border-marine/50 hover:text-marine"
+      >
+        <IconMinus size={14} />
+      </button>
+      <span className="tnum w-7 text-center text-[15px] font-semibold">{value}</span>
+      <button
+        type="button"
+        aria-label={`${label}を増やす`}
+        onClick={() => step(1)}
+        className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-fg-dim transition-colors hover:border-marine/50 hover:text-marine"
+      >
+        <IconPlus size={14} />
+      </button>
+    </div>
+  )
+}
+
+/** InlineRow の中に置く、入り切りのスイッチ */
+export function Switch({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string
+  checked: boolean
+  onChange: (next: boolean) => void
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={`relative h-5 w-9 rounded-full transition-colors ${checked ? 'bg-marine' : 'bg-line'}`}
+    >
+      <span
+        className={`absolute top-0.5 h-4 w-4 rounded-full bg-ink transition-all ${
+          checked ? 'left-[18px]' : 'left-0.5'
+        }`}
+      />
+    </button>
+  )
+}
 
 // -------------------------------------------------------------- Status ----
 export function StatusPill({

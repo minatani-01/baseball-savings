@@ -2,26 +2,31 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Amount, Button, Chip, Field, Sheet, inputClass } from '@/components/ui'
+import { Amount, Button, Chip, Field, Sheet, inputClassCompact } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { today } from '@/lib/format'
-import type { SavingEntryRow } from '@/types'
+import type { SavingCustomPreset, SavingEntryRow } from '@/types'
 
 const QUICK_AMOUNTS = [300, 500, 1000, 3000]
 
 /**
- * カスタム登録（試合結果から自動計算できない分を任意額で積み立てる）。
+ * カスタム登録（試合結果から自動計算できない分を積み立てる）。
  * saving_entries に kind='custom' / game_id=null で保存する。
  *
- * NPB 公式は1試合ごとの個人打撃成績を公開していないため、
- * マルチ安打と打点は自動登録では扱わず、ここで登録する。
+ * NPB 公式から取得できない項目はここで登録する。
+ * 定型を選ぶと、その名前と金額が入る。定型は貯金ルールの画面で増やせる。
+ * 珍記録のように決まった金額が無いものは、そのまま手で入力する。
  */
+
 export default function CustomSavingSheet({
   entry,
+  presets,
   userId,
   onClose,
 }: {
   entry: SavingEntryRow | null
+  /** 貯金ルールの画面で増やせる定型 */
+  presets: SavingCustomPreset[]
   userId: string
   onClose: () => void
 }) {
@@ -35,6 +40,12 @@ export default function CustomSavingSheet({
 
   const parsedAmount = Math.max(0, Number.parseInt(amount || '0', 10) || 0)
   const canSubmit = title.trim().length > 0 && parsedAmount > 0 && Boolean(date)
+
+  /** 定型を選んだら、その他と金額をその場で埋める（どちらも後から直せる） */
+  const applyPreset = (preset: SavingCustomPreset) => {
+    setTitle(preset.label)
+    setAmount(String(preset.amount))
+  }
 
   const save = async () => {
     if (!canSubmit) return
@@ -80,23 +91,46 @@ export default function CustomSavingSheet({
         </div>
       }
     >
-      <div className="flex flex-col gap-5">
-        <Field label="日付">
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className={inputClass}
-          />
-        </Field>
+      <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="日付">
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className={inputClassCompact}
+            />
+          </Field>
 
-        <Field label="内容">
+          <Field label="定型" hint="貯金ルールで追加">
+            <select
+              value={presets.find((p) => p.label === title)?.id ?? ''}
+              onChange={(e) => {
+                const preset = presets.find((p) => p.id === e.target.value)
+                if (preset) applyPreset(preset)
+              }}
+              className={inputClassCompact}
+              disabled={presets.length === 0}
+            >
+              <option value="">
+                {presets.length === 0 ? '定型がありません' : '選択しない'}
+              </option>
+              {presets.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}　¥{preset.amount.toLocaleString()}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+
+        <Field label="その他" hint="定型を選ぶと入ります">
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="例: マルチ安打 2人 / 打点 3"
-            className={inputClass}
+            placeholder="例: 代打逆転満塁ホームラン"
+            className={inputClassCompact}
           />
         </Field>
 
@@ -109,7 +143,7 @@ export default function CustomSavingSheet({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0"
-              className={`${inputClass} tnum`}
+              className={`${inputClassCompact} tnum`}
             />
             <div className="grid grid-cols-4 gap-2">
               {QUICK_AMOUNTS.map((v) => (
@@ -127,7 +161,7 @@ export default function CustomSavingSheet({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="残しておきたいこと"
-            className={inputClass}
+            className={inputClassCompact}
           />
         </Field>
 
@@ -137,7 +171,7 @@ export default function CustomSavingSheet({
             <Amount value={parsedAmount} size="lg" tone="marine" />
           </div>
           <p className="mt-2 text-[11px] text-fg-mute">
-            カスタム登録にはフェーズ倍率も貯金ルールも適用されません。
+            カスタム登録にフェーズ倍率は適用されません。
           </p>
         </div>
       </div>
