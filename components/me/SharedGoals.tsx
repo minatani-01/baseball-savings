@@ -14,6 +14,7 @@ import {
 } from '@/components/ui'
 import { IconPlus, IconTrash } from '@/components/icons'
 import { createClient } from '@/lib/supabase/client'
+import { withTapFeedback } from '@/lib/haptics'
 import { yen } from '@/lib/format'
 import type { MarineLinkView, SharedGoalView } from '@/types'
 
@@ -222,7 +223,7 @@ export default function SharedGoals({
             <Field label="一緒に貯める相手">
               <select
                 value={linkId}
-                onChange={(e) => setLinkId(e.target.value)}
+                onChange={withTapFeedback((e) => setLinkId(e.target.value))}
                 className={inputClass}
               >
                 {connected.map((link) => (

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Amount, Button, Chip, Field, Sheet, inputClassCompact } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { today } from '@/lib/format'
+import { tapFeedback } from '@/lib/haptics'
 import type { SavingCustomPreset, SavingEntryRow } from '@/types'
 
 const QUICK_AMOUNTS = [300, 500, 1000, 3000]
@@ -43,6 +44,7 @@ export default function CustomSavingSheet({
 
   /** 定型を選んだら、その他と金額をその場で埋める（どちらも後から直せる） */
   const applyPreset = (preset: SavingCustomPreset) => {
+    tapFeedback()
     setTitle(preset.label)
     setAmount(String(preset.amount))
   }

@@ -17,6 +17,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { calcSaving } from '@/lib/savings'
 import { today } from '@/lib/format'
+import { withTapFeedback } from '@/lib/haptics'
 import {
   AUTO_PITCHING_HIGHLIGHTS,
   HOME_AWAY,
@@ -261,7 +262,7 @@ export default function GameSheet({
           <Field label="フェーズ" hint={`×${Number(rules[phaseRuleKey]).toFixed(1)}`}>
             <select
               value={form.phase}
-              onChange={(e) => upd('phase', e.target.value as Phase)}
+              onChange={withTapFeedback((e) => upd('phase', e.target.value as Phase))}
               className={inputClassCompact}
             >
               {PHASES.map((p) => (
@@ -275,7 +276,7 @@ export default function GameSheet({
           <Field label="対戦相手">
             <select
               value={form.opponent}
-              onChange={(e) => upd('opponent', e.target.value)}
+              onChange={withTapFeedback((e) => upd('opponent', e.target.value))}
               className={inputClassCompact}
             >
               {OPPONENTS.map((o) => (
@@ -345,7 +346,7 @@ export default function GameSheet({
           <div className="flex flex-col gap-2">
             <select
               value={form.pitching_highlight}
-              onChange={(e) => upd('pitching_highlight', e.target.value as PitchingHighlight)}
+              onChange={withTapFeedback((e) => upd('pitching_highlight', e.target.value as PitchingHighlight))}
               className={inputClassCompact}
             >
               {AUTO_PITCHING_HIGHLIGHTS.map((p) => (
