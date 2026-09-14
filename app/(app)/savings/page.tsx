@@ -8,20 +8,18 @@ import {
   getSavingRules,
   getSessionUser,
   getSharedGoals,
-  getSharedSavingEntries,
 } from '@/lib/queries'
 
 export default async function SavingsPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const [entries, monthlySavings, rules, goals, profile, shared, games] = await Promise.all([
+  const [entries, monthlySavings, rules, goals, profile, games] = await Promise.all([
     getSavingEntries(user.id),
     getMonthlySavings(user.id),
     getSavingRules(),
     getSharedGoals(),
     getProfile(user.id),
-    getSharedSavingEntries(user.id),
     // 共通の試合。自分がまだ積み立てていないものを拾うために使う
     getRecentGames(400),
   ])
@@ -34,7 +32,6 @@ export default async function SavingsPage() {
       rules={rules}
       goals={goals}
       isMaster={profile?.is_master ?? false}
-      shared={shared}
       games={games}
     />
   )

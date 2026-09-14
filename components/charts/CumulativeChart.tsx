@@ -1,44 +1,110 @@
-import { shortDate, yen } from '@/lib/format'
+import { yen } from '@/lib/format'
 
-export type ChartPoint = { date: string; value: number }
+export type ChartPoint = { label: string; value: number }
 
 /**
  * 累計貯金額の推移。外部チャートライブラリを使わず SVG で描画する。
  * （バンドルを増やさず、Marine Wallet のトンマナに合わせた線幅・発光を直接制御するため）
+ *
+ * 目盛りは縦に金額、横に年月を置く。線だけだと「何がどれくらい」なのかが読めない。
+ * 色は1系列だけなので凡例は置かず、キャプションで何の線かを書く。
  */
+
+/**
+ * 目盛りの刻みを切りのいい数にする。
+ * 上限だけを丸めると 25,000 を4等分して 6,250 のような刻みになり、かえって読めない。
+ * 刻みの方を 1 / 2 / 2.5 / 5 × 10^n から選び、4本以内に収まる一番細かいものを使う。
+ */
+function niceStep(value: number): number {
+  if (value <= 0) return 1
+  const digits = Math.floor(Math.log10(value))
+  for (let d = digits - 1; d <= digits + 1; d += 1) {
+    const base = 10 ** d
+    for (const unit of [1, 2, 2.5, 5]) {
+      const step = base * unit
+      if (step > 0 && value / step <= 4) return step
+    }
+  }
+  return 10 ** (digits + 1)
+}
+
+/** 目盛り用の短い金額。万を超えたら「6万」「4.5万」にして横幅を詰める */
+function axisAmount(value: number, max: number): string {
+  if (max < 10000) return yen(value)
+  const man = value / 10000
+  const text = Number.isInteger(man) ? String(man) : man.toFixed(1)
+  return `${text}万`
+}
+
 export default function CumulativeChart({
   points,
-  height = 200,
+  height = 208,
+  caption,
+  emptyLabel = '記録が2件以上たまるとグラフが表示されます',
 }: {
   points: ChartPoint[]
   height?: number
+  /** グラフの下に出す説明。何を積んだ線なのかを書く */
+  caption?: string
+  emptyLabel?: string
 }) {
-  if (points.length < 2) {
+  if (points.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-line px-6 py-12 text-center text-sm text-fg-dim">
-        2試合以上記録するとグラフが表示されます
+        {emptyLabel}
+      </div>
+    )
+  }
+
+  // 1点しかないときは線が引けない。データが無いわけではないので、
+  // 「ありません」ではなくその値を出す（推移はもう1点たまってから）
+  if (points.length === 1) {
+    return (
+      <div>
+        <div className="flex items-baseline justify-between gap-3 rounded-2xl border border-line px-4 py-5">
+          <span className="tnum text-[13px] text-fg-dim">{points[0].label}</span>
+          <span className="tnum text-2xl font-semibold text-marine">{yen(points[0].value)}</span>
+        </div>
+        <p className="mt-1.5 text-[11px] leading-relaxed text-fg-mute">
+          もう1つたまると推移のグラフになります。{caption ?? ''}
+        </p>
       </div>
     )
   }
 
   const width = 320
-  const padTop = 12
+  const padTop = 10
   const padBottom = 22
-  const padX = 4
-  const innerW = width - padX * 2
+  // 縦軸のラベルぶんだけ左を空ける。最後の点の丸が切れないよう右も少し空ける
+  const padLeft = 34
+  const padRight = 8
+  const innerW = width - padLeft - padRight
   const innerH = height - padTop - padBottom
 
-  const max = Math.max(...points.map((p) => p.value))
-  const min = 0
-  const span = max - min || 1
+  const rawMax = Math.max(...points.map((p) => p.value))
+  const step = niceStep(rawMax)
+  const max = step * Math.max(1, Math.ceil(rawMax / step))
 
-  const x = (i: number) => padX + (innerW * i) / (points.length - 1)
-  const y = (value: number) => padTop + innerH - (innerH * (value - min)) / span
+  const x = (i: number) => padLeft + (innerW * i) / (points.length - 1)
+  const y = (value: number) => padTop + innerH - (innerH * value) / max
+  const baseY = padTop + innerH
 
-  const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(2)},${y(p.value).toFixed(2)}`).join(' ')
-  const area = `${line} L${x(points.length - 1).toFixed(2)},${(padTop + innerH).toFixed(2)} L${padX},${(padTop + innerH).toFixed(2)} Z`
+  const line = points
+    .map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(2)},${y(p.value).toFixed(2)}`)
+    .join(' ')
+  const area = `${line} L${x(points.length - 1).toFixed(2)},${baseY.toFixed(2)} L${padLeft},${baseY.toFixed(2)} Z`
 
-  const gridValues = [0.25, 0.5, 0.75, 1].map((ratio) => min + span * ratio)
+  const yTicks: number[] = []
+  for (let v = 0; v <= max + 0.5; v += step) yTicks.push(v)
+
+  // 横軸のラベルは、隣とぶつからない間隔だけ残す。
+  // 文字は 8.5 なので 34 もあれば「2026年」でも重ならない
+  const minGap = 34
+  const xTicks: number[] = []
+  for (let i = 0; i < points.length; i += 1) {
+    if (i === 0 || x(i) - x(xTicks[xTicks.length - 1]) >= minGap) xTicks.push(i)
+  }
+
   const last = points[points.length - 1]
 
   return (
@@ -47,7 +113,7 @@ export default function CumulativeChart({
         viewBox={`0 0 ${width} ${height}`}
         className="h-auto w-full"
         role="img"
-        aria-label={`累計貯金額の推移。最新 ${yen(last.value)}`}
+        aria-label={`累計貯金額の推移。${points[0].label}から${last.label}まで、最新 ${yen(last.value)}`}
       >
         <defs>
           <linearGradient id="mw-chart-fill" x1="0" y1="0" x2="0" y2="1">
@@ -56,17 +122,29 @@ export default function CumulativeChart({
           </linearGradient>
         </defs>
 
-        {gridValues.map((value) => (
-          <line
-            key={value}
-            x1={padX}
-            x2={width - padX}
-            y1={y(value)}
-            y2={y(value)}
-            stroke="#1c2534"
-            strokeWidth="1"
-            vectorEffect="non-scaling-stroke"
-          />
+        {/* 目盛り線は背景に退かせ、数字だけを読ませる */}
+        {yTicks.map((value) => (
+          <g key={value}>
+            <line
+              x1={padLeft}
+              x2={width - padRight}
+              y1={y(value)}
+              y2={y(value)}
+              stroke="#1c2534"
+              strokeWidth="1"
+              vectorEffect="non-scaling-stroke"
+            />
+            <text
+              x={padLeft - 5}
+              y={y(value) + 3}
+              textAnchor="end"
+              fontSize="8.5"
+              fill="#9fb0c0"
+              className="tnum"
+            >
+              {axisAmount(value, max)}
+            </text>
+          </g>
         ))}
 
         <path d={area} fill="url(#mw-chart-fill)" />
@@ -80,12 +158,25 @@ export default function CumulativeChart({
           vectorEffect="non-scaling-stroke"
         />
         <circle cx={x(points.length - 1)} cy={y(last.value)} r="3.5" fill="#22d3ee" />
+
+        {xTicks.map((index, i) => (
+          <text
+            key={points[index].label}
+            x={x(index)}
+            y={height - 7}
+            textAnchor={i === 0 ? 'start' : i === xTicks.length - 1 ? 'end' : 'middle'}
+            fontSize="8.5"
+            fill="#6b7c8d"
+            className="tnum"
+          >
+            {points[index].label}
+          </text>
+        ))}
       </svg>
 
-      <div className="mt-1 flex justify-between text-[10px] text-fg-mute">
-        <span className="tnum">{shortDate(points[0].date)}</span>
-        <span className="tnum">{shortDate(last.date)}</span>
-      </div>
+      {caption ? (
+        <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">{caption}</p>
+      ) : null}
     </div>
   )
 }

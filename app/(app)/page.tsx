@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Amount, Card, DeltaBadge, EmptyState, SectionLabel, StatusPill } from '@/components/ui'
+import { Amount, Card, DeltaBadge, SectionLabel, StatusPill } from '@/components/ui'
 import { IconChevronRight, IconUsers, IconWallet } from '@/components/icons'
-import CumulativeChart, { type ChartPoint } from '@/components/charts/CumulativeChart'
+import SavingsTrend from '@/components/home/SavingsTrend'
+import type { ChartPoint } from '@/components/charts/CumulativeChart'
 import {
   getMonthlySavings,
   getSavingEntries,
@@ -56,22 +57,41 @@ export default async function HomePage() {
   const delta = monthOverMonth(entries, month)
   const streak = streakDays(entries)
 
-  // 貯金推移。履歴タブと同じく入金済みの月だけを積み、
-  // グラフの終点と上の累計貯金額を必ず一致させる
+  // 貯金推移。入金済みの月だけを積む（累計貯金額と同じ定義）。
+  // 当年の月別と、全期間の年別の2本を作り、画面側で切り替える
   const deposited = depositedMonthSet(monthlySavings)
-  const chartPoints: ChartPoint[] = []
+  const thisYear = Number(today().slice(0, 4))
+
+  const byMonth = new Map<string, number>()
+  const byYear = new Map<string, number>()
+  for (const entry of entries) {
+    if (!deposited.has(entry.month)) continue
+    byMonth.set(entry.month, (byMonth.get(entry.month) ?? 0) + entry.amount)
+    const y = entry.month.slice(0, 4)
+    byYear.set(y, (byYear.get(y) ?? 0) + entry.amount)
+  }
+
+  const monthlyPoints: ChartPoint[] = []
   {
     let cumulative = 0
-    for (const entry of [...entries]
-      .filter((e) => deposited.has(e.month))
-      .sort((a, b) => a.entry_date.localeCompare(b.entry_date))) {
-      cumulative += entry.amount
-      chartPoints.push({ date: entry.entry_date, value: cumulative })
+    for (const month of [...byMonth.keys()].sort()) {
+      if (!month.startsWith(`${thisYear}-`)) continue
+      cumulative += byMonth.get(month) ?? 0
+      monthlyPoints.push({ label: `${Number(month.slice(5, 7))}月`, value: cumulative })
+    }
+  }
+
+  const yearlyPoints: ChartPoint[] = []
+  {
+    let cumulative = 0
+    for (const y of [...byYear.keys()].sort()) {
+      cumulative += byYear.get(y) ?? 0
+      yearlyPoints.push({ label: `${y}年`, value: cumulative })
     }
   }
 
   // 今季の戦績。貯金の記録に紐づく試合から数える（記録＝その年の試合そのもの）
-  const record = seasonRecord(entries, Number(today().slice(0, 4)))
+  const record = seasonRecord(entries, thisYear)
 
   // 締めが終わっているのに入金まで進んでいない月をホームで先に促す
   // 締めが終わった月のうち、まだワンバンクへ入金していないもの。
@@ -226,7 +246,7 @@ export default async function HomePage() {
         </Card>
       ) : null}
 
-      {/* 貯金推移。履歴タブと同じ定義で積む（入金済みの月だけ） */}
+      {/* 貯金推移。入金済みの月だけを積む（累計貯金額と同じ定義） */}
       <div>
         <SectionLabel
           action={
@@ -242,16 +262,7 @@ export default async function HomePage() {
           貯金推移
         </SectionLabel>
 
-        {chartPoints.length === 0 ? (
-          <EmptyState
-            title="まだ入金した月がありません"
-            description="月末に金額を確定してワンバンクへ入金すると、ここに積み上がります。"
-          />
-        ) : (
-          <Card>
-            <CumulativeChart points={chartPoints} />
-          </Card>
-        )}
+        <SavingsTrend year={thisYear} monthly={monthlyPoints} yearly={yearlyPoints} />
       </div>
 
     </div>
