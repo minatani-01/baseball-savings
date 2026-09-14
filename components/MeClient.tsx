@@ -1,9 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button, Card, Field, Row, SectionLabel, inputClass } from '@/components/ui'
-import { IconBell, IconCheck, IconCopy, IconLink, IconLogout } from '@/components/icons'
+import {
+  IconBell,
+  IconCheck,
+  IconChevronRight,
+  IconCopy,
+  IconLink,
+  IconLogout,
+} from '@/components/icons'
 import { loadAppLinks, saveAppLinks, type AppLinks } from '@/components/HandoffActions'
 import { createClient } from '@/lib/supabase/client'
 import { EXTERNAL_APPS, type ExternalAppKey } from '@/lib/constants'
@@ -209,18 +217,20 @@ export default function MeClient({
 
       <div>
         <SectionLabel>Marine Link</SectionLabel>
-        <Card>
-          <div className="flex items-start gap-3">
-            <IconLink size={18} className="mt-0.5 shrink-0 text-fg-mute" />
-            <div>
-              <p className="text-[13px]">アカウント間のデータ共有</p>
-              <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
-                Marine ID での接続、共有範囲の権限設定、共同貯金は Phase 4
-                で実装予定です。現時点ではIDの発行のみ行っています。
-              </p>
-            </div>
+        <Link
+          href="/me/link"
+          prefetch={false}
+          className="glass flex items-center gap-3 rounded-2xl p-4 transition-colors hover:border-marine/50"
+        >
+          <IconLink size={18} className="shrink-0 text-fg-mute" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px]">アカウント間のデータ共有</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
+              Marine ID で接続し、貯金や割り勘を項目ごとに共有します。
+            </p>
           </div>
-        </Card>
+          <IconChevronRight size={18} className="shrink-0 text-fg-mute" />
+        </Link>
       </div>
 
       {error ? <p className="text-[13px] text-danger">{error}</p> : null}

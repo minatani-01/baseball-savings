@@ -291,3 +291,12 @@ export async function getLinkMonthlyCompare(
     partner_amount: link.received.saving ? (amountByUser.get(link.partner_id) ?? 0) : null,
   }))
 }
+
+/** 指定月の自分の積立合計。月間比較のために全件取らずに済ませる */
+export async function getMonthSavingTotal(userId: string, month: string): Promise<number> {
+  const supabase = await createClient()
+  const rows = await read<{ amount: number }[]>('saving_entries', () =>
+    supabase.from('saving_entries').select('amount').eq('user_id', userId).eq('month', month)
+  )
+  return (rows ?? []).reduce((sum, row) => sum + row.amount, 0)
+}
