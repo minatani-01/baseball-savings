@@ -10,7 +10,6 @@ import {
   IconCheck,
   IconChevronRight,
   IconCopy,
-  IconLink,
   IconLogout,
   IconUsers,
 } from '@/components/icons'
@@ -280,43 +279,24 @@ export default function MeClient({
 
       {/* メンバーと Marine Link は、共有を組み立てる側の機能なのでマスターだけに出す */}
       {profile?.is_master ? (
-        <>
-          <div>
-            <SectionLabel>メンバー</SectionLabel>
-            <Link
-              href="/me/members"
-              prefetch={false}
-              className="glass flex items-center gap-3 rounded-2xl p-4 transition-colors hover:border-marine/50"
-            >
-              <IconUsers size={18} className="shrink-0 text-fg-mute" />
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px]">一緒に使う人</p>
-                <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
-                  Marine ID の登録と、割り勘・貯金それぞれへの参加を設定します。
-                </p>
-              </div>
-              <IconChevronRight size={18} className="shrink-0 text-fg-mute" />
-            </Link>
-          </div>
-
-          <div>
-            <SectionLabel>Marine Link</SectionLabel>
-            <Link
-              href="/me/link"
-              prefetch={false}
-              className="glass flex items-center gap-3 rounded-2xl p-4 transition-colors hover:border-marine/50"
-            >
-              <IconLink size={18} className="shrink-0 text-fg-mute" />
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px]">アカウント間のデータ共有</p>
-                <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
-                  Marine ID で接続し、貯金や割り勘を項目ごとに共有します。
-                </p>
-              </div>
-              <IconChevronRight size={18} className="shrink-0 text-fg-mute" />
-            </Link>
-          </div>
-        </>
+        <div>
+          <SectionLabel>メンバー</SectionLabel>
+          <Link
+            href="/me/members"
+            prefetch={false}
+            className="glass flex items-center gap-3 rounded-2xl p-4 transition-colors hover:border-marine/50"
+          >
+            <IconUsers size={18} className="shrink-0 text-fg-mute" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px]">一緒に使う人</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
+                Marine ID での接続（Marine Link）、共有する項目、割り勘・貯金への参加を
+                まとめて設定します。
+              </p>
+            </div>
+            <IconChevronRight size={18} className="shrink-0 text-fg-mute" />
+          </Link>
+        </div>
       ) : null}
 
       {error ? <p className="text-[13px] text-danger">{error}</p> : null}

@@ -1,28 +1,79 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
+  Amount,
   Button,
   Card,
   Checkbox,
   EmptyState,
   IconButton,
   SectionLabel,
+  Sheet,
+  Toggle,
   inputClass,
 } from '@/components/ui'
 import AvatarPicker from '@/components/AvatarPicker'
-import { IconCheck, IconLink, IconPlus, IconTrash } from '@/components/icons'
+import SharedGoals from '@/components/me/SharedGoals'
+import {
+  IconCheck,
+  IconClose,
+  IconCopy,
+  IconLink,
+  IconPlus,
+  IconTrash,
+} from '@/components/icons'
 import { createClient } from '@/lib/supabase/client'
 import { rejectReason, removeAvatarFile, uploadAvatar } from '@/lib/avatar'
-import type { SplitMemberView } from '@/types'
+import { LINK_RESOURCE_META } from '@/lib/constants'
+import { monthLabel } from '@/lib/format'
+import type {
+  LinkMonthlyCompare,
+  LinkResource,
+  MarineLinkView,
+  SharedGoalView,
+  SplitMemberView,
+} from '@/types'
 
+const MARINE_ID_PATTERN = /^MW-[0-9A-Z]{6}$/
+
+const sameId = (a: string | null, b: string | null) =>
+  Boolean(a && b) && a!.trim().toUpperCase() === b!.trim().toUpperCase()
+
+/**
+ * 一緒に使う人の管理（メンバー ＋ Marine Link）。
+ *
+ * もとは「メンバー」と「Marine Link」の2画面に分かれていたが、
+ * どちらも同じ相手を Marine ID で指すため、同じ人を2か所に登録することになっていた。
+ * 1人1行にまとめ、その行の中で 接続・共有・割り勘の参加までを完結させる。
+ *
+ * 割り勘はメンバー単位（Marine ID を登録した人が参加している記録だけが相手に見える）、
+ * 貯金は接続単位（接続していれば合算）という違いは残る。仕様 Phase 4 の
+ * 「貯金は共同、割り勘は別」に沿っているため、画面の側で説明する。
+ */
 export default function MembersClient({
   userId,
+  marineId,
+  isMaster,
   members,
+  links,
+  month,
+  myMonthTotal,
+  compare,
+  goals,
 }: {
   userId: string
+  /** 自分の Marine ID */
+  marineId: string
+  /** マスター権限。自分が送ったリクエストは承認を待たずに接続される */
+  isMaster: boolean
   members: SplitMemberView[]
+  links: MarineLinkView[]
+  month: string
+  myMonthTotal: number
+  compare: LinkMonthlyCompare[]
+  goals: SharedGoalView[]
 }) {
   const router = useRouter()
   const [newName, setNewName] = useState('')
@@ -31,10 +82,41 @@ export default function MembersClient({
   // 編集中の Marine ID（メンバーID -> 入力値）。保存するまでDBには書かない
   const [draftIds, setDraftIds] = useState<Record<string, string>>({})
   const [savedId, setSavedId] = useState<string | null>(null)
-  // 写真をアップロード中のメンバーID
   const [uploading, setUploading] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [permissionTarget, setPermissionTarget] = useState<MarineLinkView | null>(null)
+
+  const connected = useMemo(() => links.filter((l) => l.status === 'accepted'), [links])
+  const incoming = useMemo(
+    () => links.filter((l) => l.status === 'pending' && !l.outgoing),
+    [links]
+  )
+
+  /** メンバーに対応する接続。Marine ID で突き合わせる（DB側の判定と同じ規則） */
+  const linkOf = (member: SplitMemberView) =>
+    links.find((l) => sameId(l.partner_marine_id, member.marine_id)) ?? null
+
+  /** どのメンバーにも紐づいていない接続。メンバーへ取り込めるように別枠で出す */
+  const unlistedLinks = useMemo(
+    () =>
+      connected.filter(
+        (l) => !members.some((m) => sameId(l.partner_marine_id, m.marine_id))
+      ),
+    [connected, members]
+  )
 
   const draftOf = (member: SplitMemberView) => draftIds[member.id] ?? member.marine_id ?? ''
+
+  const copyMarineId = async () => {
+    if (!marineId) return
+    try {
+      await navigator.clipboard.writeText(marineId)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {
+      window.prompt('Marine ID', marineId)
+    }
+  }
 
   const setJoin = async (
     member: SplitMemberView,
@@ -59,7 +141,7 @@ export default function MembersClient({
   const saveMarineId = async (member: SplitMemberView) => {
     const raw = draftOf(member).trim().toUpperCase()
     // 空欄は「登録しない」。書式が違うものは DB の CHECK に弾かれる前にここで止める
-    if (raw !== '' && !/^MW-[0-9A-Z]{6}$/.test(raw)) {
+    if (raw !== '' && !MARINE_ID_PATTERN.test(raw)) {
       setError('Marine ID は MW- に続く6文字で入力してください')
       return
     }
@@ -77,6 +159,74 @@ export default function MembersClient({
     }
     setSavedId(member.id)
     setTimeout(() => setSavedId((prev) => (prev === member.id ? null : prev)), 1800)
+    router.refresh()
+  }
+
+  /** そのメンバーのアカウントへ接続をリクエストする */
+  const connect = async (member: SplitMemberView) => {
+    if (!member.marine_id) return
+    setBusy(true)
+    setError(null)
+    const supabase = createClient()
+    const { error } = await supabase.rpc('request_marine_link', {
+      target_marine_id: member.marine_id,
+    })
+    setBusy(false)
+    if (error) {
+      // RPC 側で日本語のメッセージを投げているのでそのまま出す
+      setError(error.message)
+      return
+    }
+    router.refresh()
+  }
+
+  const respond = async (link: MarineLinkView, status: 'accepted' | 'rejected') => {
+    setBusy(true)
+    setError(null)
+    const supabase = createClient()
+    const { error } = await supabase.from('marine_links').update({ status }).eq('id', link.id)
+    setBusy(false)
+    if (error) {
+      setError(error.message)
+      return
+    }
+    router.refresh()
+  }
+
+  const disconnect = async (link: MarineLinkView, confirmText: string) => {
+    if (!window.confirm(confirmText)) return
+    setBusy(true)
+    setError(null)
+    const supabase = createClient()
+    const { error } = await supabase.from('marine_links').delete().eq('id', link.id)
+    setBusy(false)
+    if (error) {
+      setError(error.message)
+      return
+    }
+    setPermissionTarget(null)
+    router.refresh()
+  }
+
+  const setPermission = async (link: MarineLinkView, resource: LinkResource, next: boolean) => {
+    setError(null)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('link_permissions')
+      .update({ permission: next })
+      .eq('marine_link_id', link.id)
+      .eq('owner_id', userId)
+      .eq('resource_type', resource)
+    if (error) {
+      setError(error.message)
+      return
+    }
+    // 画面の値はサーバーから取り直す。楽観更新にすると失敗時の戻しが要る
+    setPermissionTarget((prev) =>
+      prev && prev.id === link.id
+        ? { ...prev, shared: { ...prev.shared, [resource]: next } }
+        : prev
+    )
     router.refresh()
   }
 
@@ -139,10 +289,10 @@ export default function MembersClient({
     router.refresh()
   }
 
-  const add = async () => {
-    const name = newName.trim()
-    if (!name) return
-    if (members.some((m) => m.name === name)) {
+  const add = async (name: string, marine: string | null = null) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    if (members.some((m) => m.name === trimmed)) {
       setError('同じ名前のメンバーがすでにいます')
       return
     }
@@ -151,7 +301,8 @@ export default function MembersClient({
     const supabase = createClient()
     const { error } = await supabase.from('split_members').insert({
       user_id: userId,
-      name,
+      name: trimmed,
+      marine_id: marine,
       sort_order: members.length,
     })
     setBusy(false)
@@ -178,7 +329,7 @@ export default function MembersClient({
   const remove = async (member: SplitMemberView) => {
     if (
       !window.confirm(
-        `${member.name} を削除しますか？\n過去の記録に保存された名前と金額はそのまま残ります。`
+        `${member.name} を削除しますか？\n過去の記録に保存された名前と金額はそのまま残ります。\n接続そのものは解除されません。`
       )
     ) {
       return
@@ -191,127 +342,251 @@ export default function MembersClient({
     router.refresh()
   }
 
+  const partnerLabel = (link: MarineLinkView) =>
+    link.partner_name.trim() || link.partner_marine_id || '相手'
+
   return (
     <div className="flex flex-col gap-6">
+      {/* 自分の Marine ID。相手に伝えてもらうための入り口 */}
       <div>
-        <SectionLabel>Members</SectionLabel>
-        {members.length === 0 ? (
-          <EmptyState title="メンバーがいません" description="下のフォームから追加してください。" />
-        ) : (
+        <SectionLabel>あなたの Marine ID</SectionLabel>
+        <Card>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="tnum text-2xl font-semibold tracking-[0.16em] text-marine">
+                {marineId || '------'}
+              </div>
+              <p className="mt-1 text-[11px] leading-relaxed text-fg-mute">
+                このIDを相手に伝えると、相手から接続をリクエストしてもらえます。
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={copyMarineId}
+              disabled={!marineId}
+              aria-label="Marine IDをコピー"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line text-fg-mute transition-colors hover:border-marine/50 hover:text-marine disabled:opacity-40"
+            >
+              {copied ? <IconCheck size={17} /> : <IconCopy size={17} />}
+            </button>
+          </div>
+        </Card>
+      </div>
+
+      {/* 届いているリクエスト */}
+      {incoming.length > 0 ? (
+        <div>
+          <SectionLabel>届いているリクエスト</SectionLabel>
           <div className="flex flex-col gap-2">
-            {members.map((member) => (
-              <Card key={member.id} className="!p-3">
+            {incoming.map((link) => (
+              <Card key={link.id}>
                 <div className="flex items-center gap-3">
-                  {/* 写真の差し替え。アイコンごとタップで端末の画像選択が開く */}
-                  <AvatarPicker
-                    name={member.name}
-                    src={member.avatar_url}
-                    hasPhoto={Boolean(member.avatar_path)}
-                    selected={member.is_self}
-                    disabled={busy}
-                    onFile={(file) => uploadPhoto(member, file)}
-                  />
-
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm">{member.name}</div>
-                    {uploading === member.id ? (
-                      <div className="text-[11px] text-fg-mute">写真を保存しています</div>
-                    ) : member.is_self ? (
-                      <div className="text-[11px] text-marine">あなた</div>
-                    ) : null}
+                    <div className="truncate text-sm font-medium">{partnerLabel(link)}</div>
+                    <div className="tnum text-[11px] text-fg-mute">{link.partner_marine_id}</div>
                   </div>
-
                   <IconButton
-                    label={member.is_self ? '「あなた」を解除' : '「あなた」に設定'}
-                    onClick={() => markSelf(member)}
+                    label="承認"
+                    onClick={() => respond(link, 'accepted')}
                     disabled={busy}
-                    className={member.is_self ? 'border-marine/60 text-marine' : ''}
+                    className="border-marine/60 text-marine"
                   >
-                    <IconCheck size={15} />
+                    <IconCheck size={16} />
                   </IconButton>
                   <IconButton
-                    label="削除"
-                    onClick={() => remove(member)}
+                    label="却下"
+                    onClick={() => respond(link, 'rejected')}
                     disabled={busy}
                     className="hover:border-danger/50 hover:text-danger"
                   >
-                    <IconTrash size={15} />
+                    <IconClose size={16} />
                   </IconButton>
-                </div>
-
-                <div className="mt-2.5 border-t border-line pt-2.5">
-                  {/* Marine ID。登録するとこの人が参加した割り勘が相手から見えるようになる */}
-                  {member.is_self ? null : (
-                    <div className="flex items-center gap-2">
-                      <IconLink size={15} className="shrink-0 text-fg-mute" />
-                      <input
-                        type="text"
-                        value={draftOf(member)}
-                        onChange={(e) => {
-                          setDraftIds((prev) => ({
-                            ...prev,
-                            [member.id]: e.target.value.toUpperCase(),
-                          }))
-                          setError(null)
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') saveMarineId(member)
-                        }}
-                        placeholder="Marine ID（未登録）"
-                        autoCapitalize="characters"
-                        spellCheck={false}
-                        className={`${inputClass} tnum !py-1.5 text-[13px] tracking-[0.1em]`}
-                      />
-                      <Button
-                        onClick={() => saveMarineId(member)}
-                        disabled={busy || draftOf(member) === (member.marine_id ?? '')}
-                        className="shrink-0 !min-h-[36px] !px-3 text-[12px]"
-                      >
-                        {savedId === member.id ? <IconCheck size={15} /> : '保存'}
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* 参加する機能 */}
-                  <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                    <span className="text-[11px] text-fg-mute">参加</span>
-                    <Checkbox
-                      checked={member.join_split}
-                      onChange={(next) => setJoin(member, 'join_split', next)}
-                      disabled={busy}
-                      label="割り勘"
-                    />
-                    <Checkbox
-                      checked={member.join_saving}
-                      onChange={(next) => setJoin(member, 'join_saving', next)}
-                      disabled={busy}
-                      label="貯金"
-                    />
-                    {member.avatar_path ? (
-                      <button
-                        type="button"
-                        onClick={() => removePhoto(member)}
-                        disabled={busy}
-                        className="ml-auto shrink-0 text-[11px] text-fg-mute transition-colors hover:text-danger disabled:opacity-40"
-                      >
-                        写真を削除
-                      </button>
-                    ) : null}
-                  </div>
-
-                  {!member.is_self && !member.marine_id ? (
-                    <p className="mt-1.5 text-[11px] leading-relaxed text-fg-mute">
-                      Marine ID を登録すると、この人が参加した割り勘が相手から見えるようになります。
-                      貯金は接続していれば自動で合算されるため、ここの指定は
-                      Marine ID を登録した相手にだけ効きます。
-                    </p>
-                  ) : null}
                 </div>
               </Card>
             ))}
           </div>
+        </div>
+      ) : null}
+
+      {/* メンバー。1人1行で、接続と共有までここで完結させる */}
+      <div>
+        <SectionLabel>メンバー</SectionLabel>
+        {members.length === 0 ? (
+          <EmptyState title="メンバーがいません" description="下のフォームから追加してください。" />
+        ) : (
+          <div className="flex flex-col gap-2">
+            {members.map((member) => {
+              const link = linkOf(member)
+              const draft = draftOf(member)
+              return (
+                <Card key={member.id} className="!p-3">
+                  <div className="flex items-center gap-3">
+                    <AvatarPicker
+                      name={member.name}
+                      src={member.avatar_url}
+                      hasPhoto={Boolean(member.avatar_path)}
+                      selected={member.is_self}
+                      disabled={busy}
+                      onFile={(file) => uploadPhoto(member, file)}
+                    />
+
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm">{member.name}</div>
+                      {uploading === member.id ? (
+                        <div className="text-[11px] text-fg-mute">写真を保存しています</div>
+                      ) : member.is_self ? (
+                        <div className="text-[11px] text-marine">あなた</div>
+                      ) : link?.status === 'accepted' ? (
+                        <div className="text-[11px] text-teal">接続済み</div>
+                      ) : link?.status === 'pending' ? (
+                        <div className="text-[11px] text-warn">
+                          {link.outgoing ? '承認待ち' : 'リクエストが届いています'}
+                        </div>
+                      ) : member.marine_id ? (
+                        <div className="text-[11px] text-fg-mute">未接続</div>
+                      ) : null}
+                    </div>
+
+                    <IconButton
+                      label={member.is_self ? '「あなた」を解除' : '「あなた」に設定'}
+                      onClick={() => markSelf(member)}
+                      disabled={busy}
+                      className={member.is_self ? 'border-marine/60 text-marine' : ''}
+                    >
+                      <IconCheck size={15} />
+                    </IconButton>
+                    <IconButton
+                      label="削除"
+                      onClick={() => remove(member)}
+                      disabled={busy}
+                      className="hover:border-danger/50 hover:text-danger"
+                    >
+                      <IconTrash size={15} />
+                    </IconButton>
+                  </div>
+
+                  {member.is_self ? null : (
+                    <div className="mt-2.5 border-t border-line pt-2.5">
+                      {/* Marine ID と接続。相手がアプリを使っているときだけ意味を持つ */}
+                      <div className="flex items-center gap-2">
+                        <IconLink size={15} className="shrink-0 text-fg-mute" />
+                        <input
+                          type="text"
+                          value={draft}
+                          onChange={(e) => {
+                            setDraftIds((prev) => ({
+                              ...prev,
+                              [member.id]: e.target.value.toUpperCase(),
+                            }))
+                            setError(null)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveMarineId(member)
+                          }}
+                          placeholder="Marine ID（未登録）"
+                          autoCapitalize="characters"
+                          spellCheck={false}
+                          className={`${inputClass} tnum !py-1.5 text-[13px] tracking-[0.1em]`}
+                        />
+                        {draft !== (member.marine_id ?? '') ? (
+                          <Button
+                            onClick={() => saveMarineId(member)}
+                            disabled={busy}
+                            className="shrink-0 !min-h-[36px] !px-3 text-[12px]"
+                          >
+                            {savedId === member.id ? <IconCheck size={15} /> : '保存'}
+                          </Button>
+                        ) : member.marine_id && !link ? (
+                          <Button
+                            onClick={() => connect(member)}
+                            disabled={busy}
+                            variant="primary"
+                            className="shrink-0 !min-h-[36px] !px-3 text-[12px]"
+                          >
+                            接続
+                          </Button>
+                        ) : link?.status === 'accepted' ? (
+                          <Button
+                            onClick={() => setPermissionTarget(link)}
+                            disabled={busy}
+                            className="shrink-0 !min-h-[36px] !px-3 text-[12px]"
+                          >
+                            共有設定
+                          </Button>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] text-fg-mute">割り勘</span>
+                        <Checkbox
+                          checked={member.join_split}
+                          onChange={(next) => setJoin(member, 'join_split', next)}
+                          disabled={busy}
+                          label="共有する"
+                        />
+                        <span className="ml-2 text-[11px] text-fg-mute">貯金</span>
+                        <Checkbox
+                          checked={member.join_saving}
+                          onChange={(next) => setJoin(member, 'join_saving', next)}
+                          disabled={busy}
+                          label="合算する"
+                        />
+                        {member.avatar_path ? (
+                          <button
+                            type="button"
+                            onClick={() => removePhoto(member)}
+                            disabled={busy}
+                            className="ml-auto shrink-0 text-[11px] text-fg-mute transition-colors hover:text-danger disabled:opacity-40"
+                          >
+                            写真を削除
+                          </button>
+                        ) : null}
+                      </div>
+
+                      {!member.marine_id ? (
+                        <p className="mt-1.5 text-[11px] leading-relaxed text-fg-mute">
+                          Marine ID を登録して接続すると、割り勘の共有と貯金の合算ができます。
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+                </Card>
+              )
+            })}
+          </div>
         )}
       </div>
+
+      {/* メンバーに載っていない接続。取り込めるようにしておく */}
+      {unlistedLinks.length > 0 ? (
+        <div>
+          <SectionLabel>メンバー未登録の接続</SectionLabel>
+          <div className="flex flex-col gap-2">
+            {unlistedLinks.map((link) => (
+              <Card key={link.id}>
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{partnerLabel(link)}</div>
+                    <div className="tnum text-[11px] text-fg-mute">{link.partner_marine_id}</div>
+                  </div>
+                  <Button
+                    onClick={() => add(partnerLabel(link), link.partner_marine_id)}
+                    disabled={busy}
+                    className="shrink-0 !min-h-[36px] !px-3 text-[12px]"
+                  >
+                    <IconPlus size={15} />
+                    メンバーに追加
+                  </Button>
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-fg-mute">
+                  接続しているので貯金は合算されています。割り勘でも共有するには、
+                  メンバーに追加してください。
+                </p>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div>
         <SectionLabel>メンバーを追加</SectionLabel>
@@ -325,12 +600,12 @@ export default function MembersClient({
                 setError(null)
               }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') add()
+                if (e.key === 'Enter') add(newName)
               }}
               placeholder="名前"
               className={inputClass}
             />
-            <Button onClick={add} disabled={busy || !newName.trim()} className="shrink-0">
+            <Button onClick={() => add(newName)} disabled={busy || !newName.trim()} className="shrink-0">
               <IconPlus size={16} />
               追加
             </Button>
@@ -339,30 +614,116 @@ export default function MembersClient({
         </Card>
       </div>
 
+      {/* 共同貯金（仕様書 17章） */}
+      <SharedGoals userId={userId} goals={goals} connected={connected} />
+
+      {/* 月間比較（仕様書 16章） */}
+      {compare.length > 0 ? (
+        <div>
+          <SectionLabel>{monthLabel(month)}の比較</SectionLabel>
+          <Card>
+            <div className="divide-hairline">
+              <div className="flex items-center justify-between gap-3 py-2">
+                <span className="text-[13px]">あなた</span>
+                <Amount value={myMonthTotal} size="sm" tone="marine" />
+              </div>
+              {compare.map((row) => (
+                <div key={row.partner_id} className="flex items-center justify-between gap-3 py-2">
+                  <span className="truncate text-[13px]">{row.partner_name || '相手'}</span>
+                  {row.partner_amount === null ? (
+                    <span className="text-[12px] text-fg-mute">非共有</span>
+                  ) : (
+                    <Amount value={row.partner_amount} size="sm" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      ) : null}
+
       <div>
         <SectionLabel>この画面について</SectionLabel>
         <Card>
           <p className="text-[13px] leading-relaxed text-fg-mute">
             Marine Wallet を一緒に使う人をここで管理します。人数の上限はありません。
             名前を変更・削除しても、過去の記録に保存された名前と負担額は変わりません。
+            アイコンをタップすると写真を設定できます。
           </p>
           <p className="mt-2.5 text-[13px] leading-relaxed text-fg-mute">
-            アイコンをタップすると写真を設定できます。正方形に切り出して縮めてから保存し、
-            写真は自分だけが見られる場所に置きます。設定していない人は名前の頭文字を表示します。
+            相手も Marine Wallet を使っているなら、Marine ID を登録して「接続」を押してください
+            （相手が承認すると接続されます）。接続すると、割り勘の共有と貯金の合算ができます。
+            {isMaster ? 'マスター権限のため、あなたが送ったリクエストは承認を待たずに接続されます。' : ''}
           </p>
           <p className="mt-2.5 text-[13px] leading-relaxed text-fg-mute">
-            割り勘の共有はメンバー単位です。相手の Marine ID を登録して「割り勘」にチェックを入れると、
-            その人が参加している記録だけが相手から見えます（参加していない記録は見えません。
-            相手が書き換えることもできません）。
-          </p>
-          <p className="mt-2.5 text-[13px] leading-relaxed text-fg-mute">
-            貯金は Marine Link で接続していれば自動で合算されます。メンバーとして登録していなくても、
-            接続済みで相手が貯金を共有していれば総累計貯金額に入ります。合算するのは入金済みの月だけです。
-            特定の人を総累計から外したいときだけ、その人の Marine ID を登録したうえで
-            「貯金」のチェックを外してください。
+            割り勘はメンバー単位です。「割り勘 / 共有する」にチェックを入れると、その人が
+            参加している記録だけが相手から見えます（参加していない記録は見えません。相手が
+            書き換えることもできません）。貯金は接続単位で、接続していれば入金済みの月が
+            総累計貯金額に合算されます。合算から外したい相手だけ「貯金 / 合算する」の
+            チェックを外してください。何を相手に見せるかは、行の「共有設定」で項目ごとに選べます。
           </p>
         </Card>
       </div>
+
+      {/* 共有設定 */}
+      {permissionTarget ? (
+        <Sheet
+          title={`${partnerLabel(permissionTarget)} との共有設定`}
+          onClose={() => setPermissionTarget(null)}
+        >
+          <p className="mb-4 text-[11px] leading-relaxed text-fg-mute">
+            あなたのデータのうち、相手に見せるものを選びます。相手からは閲覧のみで、
+            書き換えはできません。試合結果は全ユーザー共通のデータなので、常に共有されます。
+          </p>
+
+          <div className="divide-hairline">
+            {LINK_RESOURCE_META.map((resource) => (
+              <Toggle
+                key={resource.id}
+                checked={permissionTarget.shared[resource.id]}
+                onChange={(next) => setPermission(permissionTarget, resource.id, next)}
+                label={resource.label}
+                hint={resource.hint}
+              />
+            ))}
+          </div>
+
+          <div className="mt-5 border-t border-line pt-4">
+            <p className="eyebrow mb-2">相手があなたに公開しているもの</p>
+            <div className="flex flex-wrap gap-1.5">
+              {LINK_RESOURCE_META.filter((r) => permissionTarget.received[r.id]).length === 0 ? (
+                <p className="text-[12px] text-fg-mute">なし</p>
+              ) : (
+                LINK_RESOURCE_META.filter((r) => permissionTarget.received[r.id]).map((r) => (
+                  <span
+                    key={r.id}
+                    className="rounded-full border border-line px-2.5 py-1 text-[11px] text-fg-dim"
+                  >
+                    {r.label}
+                  </span>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <Button
+              variant="danger"
+              full
+              disabled={busy}
+              onClick={() =>
+                disconnect(
+                  permissionTarget,
+                  `${partnerLabel(permissionTarget)} との接続を解除しますか？\n\n共有は双方向に停止します。再接続するには、もう一度リクエストと承認が必要です。\nメンバーそのものは残ります。`
+                )
+              }
+            >
+              <IconTrash size={17} />
+              接続を解除
+            </Button>
+          </div>
+        </Sheet>
+      ) : null}
     </div>
   )
 }
