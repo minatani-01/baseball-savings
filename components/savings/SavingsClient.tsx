@@ -312,18 +312,18 @@ export default function SavingsClient({
           <Segmented
             value={addMode}
             options={[
-              { id: 'game', label: '試合登録' },
-              { id: 'custom', label: 'カスタム貯金' },
+              { id: 'game', label: '自動登録' },
+              { id: 'custom', label: 'カスタム登録' },
             ]}
             onChange={(v) => setAddMode(v as SheetMode)}
           />
           <p className="mt-3 text-[11px] leading-relaxed text-fg-mute">
             {addMode === 'game'
               ? '試合結果を登録すると、貯金ルールに沿って積立予定額を自動計算します。'
-              : '試合に紐づかない任意の金額を積み立てます。フェーズ倍率は適用されません。'}
+              : 'マルチ安打や打点など、試合結果から自動計算できない分をここで積み立てます。フェーズ倍率は適用されません。'}
           </p>
           <Button variant="primary" full className="mt-3" onClick={openAdd}>
-            {addMode === 'game' ? '試合を登録する' : 'カスタム貯金を追加する'}
+            {addMode === 'game' ? '試合を登録する' : 'カスタム登録を追加する'}
             <IconChevronRight size={16} />
           </Button>
         </Card>
@@ -449,7 +449,7 @@ export default function SavingsClient({
         {monthEntries.length === 0 ? (
           <EmptyState
             title="この月の記録はまだありません"
-            description="試合を登録するか、カスタム貯金で任意の金額を積み立ててください。"
+            description="試合を登録するか、カスタム登録で任意の金額を積み立ててください。"
           />
         ) : (
           <div className="flex flex-col gap-2">

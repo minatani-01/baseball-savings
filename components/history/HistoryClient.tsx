@@ -42,7 +42,7 @@ export default function HistoryClient({
           title: entry.game
             ? `${resultLabel(entry.game.result, entry.game.is_sayonara)} vs ${opponentLabel(entry.game.opponent)}`
             : entry.title,
-          caption: entry.game ? '試合貯金' : 'カスタム貯金',
+          caption: entry.game ? '自動登録' : 'カスタム登録',
           amount: entry.amount,
           isCustom: entry.kind === 'custom',
         })),

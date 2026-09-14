@@ -34,13 +34,13 @@ const AMOUNT_SECTIONS: { title: string; note?: string; items: { key: AmountKey; 
     ],
   },
   {
+    // マルチ安打と打点は NPB 公式が1試合ごとの個人成績を公開していないため、
+    // 自動登録の対象から外した。積み立てる場合はカスタム登録で金額を直接入力する。
     title: '打撃',
-    note: '満塁ホームランはホームラン本数に含めず別に数えます',
+    note: '満塁ホームランはホームラン本数に含めず別に数えます。マルチ安打と打点はカスタム登録で積み立てます',
     items: [
       { key: 'home_run_amount', label: 'ホームラン（1本あたり）' },
       { key: 'grand_slam_amount', label: '満塁ホームラン（1本あたり）' },
-      { key: 'multi_hit_amount', label: 'マルチ安打（1人あたり）' },
-      { key: 'rbi_amount', label: '打点（1点あたり）' },
     ],
   },
   {
