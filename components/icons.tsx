@@ -117,6 +117,22 @@ export function IconChevronRight(props: IconProps) {
   )
 }
 
+export function IconChevronUp(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5.5 15 12 8.5 18.5 15" />
+    </Icon>
+  )
+}
+
+export function IconChevronDown(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5.5 9 12 15.5 18.5 9" />
+    </Icon>
+  )
+}
+
 export function IconCopy(props: IconProps) {
   return (
     <Icon {...props}>
