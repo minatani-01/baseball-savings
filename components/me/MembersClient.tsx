@@ -299,9 +299,11 @@ export default function MembersClient({
                     ) : null}
                   </div>
 
-                  {member.join_saving && !member.is_self && !member.marine_id ? (
-                    <p className="mt-1.5 text-[11px] leading-relaxed text-warn">
-                      貯金に参加するには Marine ID の登録が必要です。
+                  {!member.is_self && !member.marine_id ? (
+                    <p className="mt-1.5 text-[11px] leading-relaxed text-fg-mute">
+                      Marine ID を登録すると、この人が参加した割り勘が相手から見えるようになります。
+                      貯金は接続していれば自動で合算されるため、ここの指定は
+                      Marine ID を登録した相手にだけ効きます。
                     </p>
                   ) : null}
                 </div>
@@ -349,10 +351,15 @@ export default function MembersClient({
             写真は自分だけが見られる場所に置きます。設定していない人は名前の頭文字を表示します。
           </p>
           <p className="mt-2.5 text-[13px] leading-relaxed text-fg-mute">
-            相手が Marine Wallet を使っているなら Marine ID を登録し、参加する機能を選んでください。
-            割り勘は、Marine Link で接続済みかつ Marine ID が一致するメンバーが参加している記録だけが
-            相手から見えます（参加していない記録は見えません。相手が書き換えることもできません）。
-            貯金は、参加しているメンバーの確定済みの積立額が総累計貯金額に合算されます。
+            割り勘の共有はメンバー単位です。相手の Marine ID を登録して「割り勘」にチェックを入れると、
+            その人が参加している記録だけが相手から見えます（参加していない記録は見えません。
+            相手が書き換えることもできません）。
+          </p>
+          <p className="mt-2.5 text-[13px] leading-relaxed text-fg-mute">
+            貯金は Marine Link で接続していれば自動で合算されます。メンバーとして登録していなくても、
+            接続済みで相手が貯金を共有していれば総累計貯金額に入ります。合算するのは入金済みの月だけです。
+            特定の人を総累計から外したいときだけ、その人の Marine ID を登録したうえで
+            「貯金」のチェックを外してください。
           </p>
         </Card>
       </div>
