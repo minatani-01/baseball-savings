@@ -15,7 +15,7 @@ import {
 } from '@/components/icons'
 import { createClient } from '@/lib/supabase/client'
 import { rejectReason, removeAvatarFile, uploadAvatar } from '@/lib/avatar'
-import type { Profile } from '@/types'
+import type { NotificationPreferences, Profile } from '@/types'
 
 export default function MeClient({
   userId,
@@ -23,6 +23,7 @@ export default function MeClient({
   initialProfile,
   avatarUrl,
   signInMethod,
+  notificationPreferences,
 }: {
   userId: string
   email: string
@@ -31,6 +32,8 @@ export default function MeClient({
   avatarUrl: string | null
   /** ログインに使っている方法の表示名（'Google' / 'メールアドレス'） */
   signInMethod: string
+  /** どの通知を受け取るか。設定が無い人は全部 true で来る */
+  notificationPreferences: NotificationPreferences
 }) {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(initialProfile)
@@ -261,7 +264,7 @@ export default function MeClient({
         </Card>
       </div>
 
-      <NotificationSettings userId={userId} />
+      <NotificationSettings userId={userId} initialPreferences={notificationPreferences} />
 
       {/* メンバーと Marine Link は、共有を組み立てる側の機能なのでマスターだけに出す */}
       {profile?.is_master ? (

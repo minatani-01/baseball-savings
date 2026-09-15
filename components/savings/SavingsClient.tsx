@@ -31,6 +31,7 @@ import CustomSavingSheet from '@/components/savings/CustomSavingSheet'
 import { createClient } from '@/lib/supabase/client'
 import { BREAKDOWN_GROUP_LABEL, calcSaving, groupBreakdown } from '@/lib/savings'
 import { depositedTotal, notDepositedTotal } from '@/lib/insights'
+import { notifyMonthConfirmed } from '@/lib/notify-client'
 import { currentMonth, monthLabel, monthLabelEn, shortDate, yen } from '@/lib/format'
 import {
   MONTHLY_STATUS_LABEL,
@@ -180,6 +181,8 @@ export default function SavingsClient({
       return
     }
     setSharedCount(typeof data === 'number' ? data : 0)
+    // 確定した人たちへ入金のお願いを送る。取り消しでは送らない
+    if (confirm) notifyMonthConfirmed(month)
     router.refresh()
   }
 

@@ -279,6 +279,17 @@ export type LinkMonthlyCompare = {
  * pending は未確定の月の見込みで、累計には足さない。
  * 相手が貯金を共有していない場合は is_visible=false になり、0円と区別できる。
  */
+/**
+ * どの通知を受け取るか。行が無いときは全部 true とみなす。
+ * 列名は lib/push.ts の NotifyCategory と揃える。
+ */
+export type NotificationPreferences = {
+  games: boolean
+  savings: boolean
+  split: boolean
+  link: boolean
+}
+
 export type SavingCircleTotal = {
   member_name: string
   marine_id: string

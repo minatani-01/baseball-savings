@@ -26,6 +26,8 @@ export async function POST() {
   const result = await sendPushToUsers([user.id], {
     title: 'Marine Wallet',
     body: '通知のテストです。これが見えていれば設定は完了しています。',
+    // 本人が今まさに押したものなので、受け取る種類の設定では止めない
+    category: 'always',
     url: '/me#notifications',
     tag: 'test',
   })

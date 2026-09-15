@@ -1,12 +1,20 @@
 import { redirect } from 'next/navigation'
 import MeClient from '@/components/MeClient'
-import { getProfile, getSessionUser, signAvatarUrl } from '@/lib/queries'
+import {
+  getNotificationPreferences,
+  getProfile,
+  getSessionUser,
+  signAvatarUrl,
+} from '@/lib/queries'
 
 export default async function MePage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const profile = await getProfile(user.id)
+  const [profile, notificationPreferences] = await Promise.all([
+    getProfile(user.id),
+    getNotificationPreferences(user.id),
+  ])
   // アイコンは非公開バケットにあるので、表示のたびに署名付きURLを発行する
   const avatarUrl = await signAvatarUrl(profile?.avatar_path ?? null)
 
@@ -17,6 +25,7 @@ export default async function MePage() {
       initialProfile={profile}
       avatarUrl={avatarUrl}
       signInMethod={user.signInMethod}
+      notificationPreferences={notificationPreferences}
     />
   )
 }

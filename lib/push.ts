@@ -10,9 +10,25 @@ import { createAdminClient } from '@/lib/supabase/admin'
  * 消えた購読を掃除する。放っておくと毎回失敗し続けて無駄になる。
  */
 
+/**
+ * 通知の種類。notification_preferences の列名と揃える。
+ *
+ * 通知1つずつに設定を分けると多くなりすぎるので、利用者から見たまとまりで持つ。
+ */
+export const NOTIFY_CATEGORIES = ['games', 'savings', 'split', 'link'] as const
+
+export type NotifyCategory = (typeof NOTIFY_CATEGORIES)[number]
+
 export type PushMessage = {
   title: string
   body: string
+  /**
+   * どの設定で止まるか。'always' は設定に関わらず送る。
+   *
+   * 必須にしてあるのは、書き忘れた通知が素通りしないようにするため。
+   * テスト送信のように本人が今まさに押したものだけ 'always' にする。
+   */
+  category: NotifyCategory | 'always'
   /** タップしたときに開くパス */
   url?: string
   /** 同じ種類の通知をまとめるための印 */
@@ -57,6 +73,33 @@ export function pushConfigured(): boolean {
 }
 
 /**
+ * 受け取る設定になっている人だけに絞る。
+ *
+ * 設定の行が無い人は「全部受け取る」とみなす。あとから設定を足したときに、
+ * 既に使っている人の通知が黙って止まらないようにするため。
+ */
+async function allowedUsers(
+  supabase: ReturnType<typeof createAdminClient>,
+  userIds: string[],
+  category: PushMessage['category']
+): Promise<string[]> {
+  if (category === 'always') return userIds
+
+  const { data, error } = await supabase
+    .from('notification_preferences')
+    .select('user_id, games, savings, split, link')
+    .in('user_id', userIds)
+
+  // 設定を引けなかったときは止めない。通知が来ないより、来る方がまだ分かる
+  if (error || !data) return userIds
+
+  const off = new Set(
+    data.filter((row) => row[category] === false).map((row) => row.user_id as string)
+  )
+  return userIds.filter((id) => !off.has(id))
+}
+
+/**
  * 指定したユーザーたちへ送る。
  *
  * 1人が複数の端末を持つので、購読の数だけ送る。
@@ -71,10 +114,14 @@ export async function sendPushToUsers(
   if (!configure()) return empty
 
   const supabase = createAdminClient()
+
+  const targets = await allowedUsers(supabase, userIds, message.category)
+  if (targets.length === 0) return empty
+
   const { data, error } = await supabase
     .from('push_subscriptions')
     .select('id, endpoint, p256dh, auth')
-    .in('user_id', userIds)
+    .in('user_id', targets)
 
   if (error || !data || data.length === 0) return empty
 
