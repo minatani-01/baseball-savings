@@ -112,8 +112,9 @@ function toForm(entry: SavingEntryRow | null): FormState {
     pitching_highlight: g.pitching_highlight,
     is_winning_pitcher: g.is_winning_pitcher ?? false,
     has_save: g.has_save,
-    other_amount: String(entry.other_amount ?? 0),
-    other_note: entry.other_note ?? '',
+    // その他ボーナスは試合の持ち物。積立側ではなく試合から読む
+    other_amount: String(g.other_amount ?? 0),
+    other_note: g.other_note ?? '',
   }
 }
 
@@ -189,6 +190,10 @@ export default function GameSheet({
       pitching_highlight: form.pitching_highlight,
       is_winning_pitcher: form.is_winning_pitcher,
       has_save: form.has_save,
+      // その他ボーナスも試合に持たせる。こうしないと、同じ試合なのに
+      // 登録した本人にだけ上乗せが付いて、人によって金額が変わる
+      other_amount: otherAmount,
+      other_note: form.other_note.trim(),
       source: 'manual' as const,
       created_by: userId,
     }
@@ -214,8 +219,9 @@ export default function GameSheet({
         entry_date: form.game_date,
         amount: calc.amount,
         breakdown: calc.lines,
-        other_amount: otherAmount,
-        other_note: form.other_note.trim(),
+        // 表示と履歴のために積立にも持つが、値は試合から写したもの
+        other_amount: game.other_amount,
+        other_note: game.other_note,
       },
       { onConflict: 'user_id,game_id' }
     )
