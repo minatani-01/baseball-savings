@@ -40,6 +40,7 @@ export function messageForKind(kind: NotifyKind, actorName: string): PushMessage
       return {
         title: '割り勘が追加されました',
         body: `${who} が新しい割り勘を登録しました。`,
+        category: 'split',
         url: '/split',
         tag: 'split',
       }
@@ -47,6 +48,7 @@ export function messageForKind(kind: NotifyKind, actorName: string): PushMessage
       return {
         title: '精算のお願いが届いています',
         body: `${who} から精算の依頼が届いています。`,
+        category: 'split',
         url: '/split',
         tag: 'split',
       }
@@ -54,6 +56,7 @@ export function messageForKind(kind: NotifyKind, actorName: string): PushMessage
       return {
         title: '接続のリクエストが届いています',
         body: `${who} から Marine Link のリクエストが届いています。`,
+        category: 'link',
         url: '/me/members',
         tag: 'link',
       }
@@ -61,6 +64,7 @@ export function messageForKind(kind: NotifyKind, actorName: string): PushMessage
       return {
         title: '接続されました',
         body: `${who} と Marine Link がつながりました。`,
+        category: 'link',
         url: '/me/members',
         tag: 'link',
       }
@@ -79,6 +83,7 @@ export function messageForGames(count: number, latest: string | null): PushMessa
   return {
     title: '試合を取り込みました',
     body,
+    category: 'games',
     url: '/savings',
     tag: 'games',
   }
@@ -97,6 +102,7 @@ export function messageForMonthConfirmed(month: string): PushMessage {
   return {
     title: '入金をお願いします',
     body: `${year}年${Number(m)}月の金額が確定しました。ワンバンクへ入金してください。`,
+    category: 'savings',
     url: '/savings',
     // 月末のリマインドとは別の印にして、片方がもう片方を置き換えないようにする
     tag: 'month-deposit',
@@ -109,6 +115,7 @@ export function messageForMonthEnd(month: string): PushMessage {
   return {
     title: '今月の貯金を確定してください',
     body: `${year}年${Number(m)}月が終わります。金額を確定して、ワンバンクへ入金してください。`,
+    category: 'savings',
     url: '/savings',
     tag: 'month-end',
   }

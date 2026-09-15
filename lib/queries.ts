@@ -11,6 +11,7 @@ import type {
   MarineLinkRow,
   MarineLinkView,
   MonthlySaving,
+  NotificationPreferences,
   Profile,
   SavingEntryRow,
   SavingCustomPreset,
@@ -152,6 +153,27 @@ export async function getProfile(userId: string): Promise<Profile | null> {
   return await read<Profile>('profiles', () =>
     supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
   )
+}
+
+/**
+ * どの通知を受け取るかの設定。
+ *
+ * 行が無い人は全部受け取る。あとから設定を足したときに、
+ * 既に使っている人の通知が黙って止まらないようにするため。
+ * 送信側（lib/push.ts）も同じ扱いにしてある。
+ */
+export async function getNotificationPreferences(
+  userId: string
+): Promise<NotificationPreferences> {
+  const supabase = await createClient()
+  const row = await read<NotificationPreferences>('notification_preferences', () =>
+    supabase
+      .from('notification_preferences')
+      .select('games, savings, split, link')
+      .eq('user_id', userId)
+      .maybeSingle()
+  )
+  return row ?? { games: true, savings: true, split: true, link: true }
 }
 
 /**

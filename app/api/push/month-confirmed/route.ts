@@ -73,5 +73,5 @@ export async function POST(request: Request) {
   const result = await sendPushToUsers(userIds, messageForMonthConfirmed(month))
 
   // 誰も通知を登録していないのは失敗ではない。呼び出し側の処理は止めない
-  return NextResponse.json({ ok: true, targets: userIds.length, ...result })
+  return NextResponse.json({ ok: true, confirmed: userIds.length, ...result })
 }

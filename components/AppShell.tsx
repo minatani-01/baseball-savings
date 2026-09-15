@@ -102,7 +102,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
               <Link
                 href="/me#notifications"
                 prefetch={false}
-                aria-label="お知らせ"
+                aria-label="通知設定"
                 className="flex h-10 w-10 items-center justify-center rounded-lg text-fg-dim transition-colors hover:text-marine"
               >
                 <IconBell size={19} />
