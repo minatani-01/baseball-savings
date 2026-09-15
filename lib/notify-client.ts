@@ -22,3 +22,18 @@ export function notifyPartner(kind: NotifyKind, targetUserId: string | null | un
     keepalive: true,
   }).catch(() => {})
 }
+
+/**
+ * 月の金額を確定したことを知らせる。
+ *
+ * 送り先はサーバーが決める。まとめて締められた相手にも入金が要るので、
+ * 「いま確定された人」を DB から引いて送る。
+ */
+export function notifyMonthConfirmed(month: string): void {
+  void fetch('/api/push/month-confirmed', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ month }),
+    keepalive: true,
+  }).catch(() => {})
+}

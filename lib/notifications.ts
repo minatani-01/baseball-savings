@@ -84,6 +84,25 @@ export function messageForGames(count: number, latest: string | null): PushMessa
   }
 }
 
+/**
+ * 確定した直後の、入金のお願い。
+ *
+ * 確定は「一緒に貯めている人の分もまとめて締める」操作なので、
+ * 締められた側は自分が操作していない。入金が要ることを知らせる。
+ *
+ * 金額は入れない。人によって額が違ううえ、ロック画面に出るため。
+ */
+export function messageForMonthConfirmed(month: string): PushMessage {
+  const [year, m] = month.split('-')
+  return {
+    title: '入金をお願いします',
+    body: `${year}年${Number(m)}月の金額が確定しました。ワンバンクへ入金してください。`,
+    url: '/savings',
+    // 月末のリマインドとは別の印にして、片方がもう片方を置き換えないようにする
+    tag: 'month-deposit',
+  }
+}
+
 /** 月末の確定・入金のリマインド */
 export function messageForMonthEnd(month: string): PushMessage {
   const [year, m] = month.split('-')
