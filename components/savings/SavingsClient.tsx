@@ -196,7 +196,8 @@ export default function SavingsClient({
     setMonthError(null)
     const supabase = createClient()
     const rows = targets.map((game) => {
-      const calc = calcSaving(game, rules)
+      // その他ボーナスは試合に付いている。自分のルールで計算した額に上乗せする
+      const calc = calcSaving(game, rules, game.other_amount)
       return {
         user_id: userId,
         game_id: game.id,
@@ -205,8 +206,8 @@ export default function SavingsClient({
         entry_date: game.game_date,
         amount: calc.amount,
         breakdown: calc.lines,
-        other_amount: 0,
-        other_note: '',
+        other_amount: game.other_amount,
+        other_note: game.other_note,
       }
     })
     const { error } = await supabase

@@ -54,6 +54,12 @@ export type Game = {
   pitching_highlight: PitchingHighlight
   is_winning_pitcher: boolean
   has_save: boolean
+  /**
+   * その他ボーナス。試合の事実なので全員で同じ値を使う。
+   * 単価が人それぞれの勝利やホームランと違い、ここは共通データに置く。
+   */
+  other_amount: number
+  other_note: string
   source: 'manual' | 'npb'
   created_by: string | null
   created_at: string
